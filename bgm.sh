@@ -21,7 +21,7 @@ SCRIPTS_FOLDER = "/media/fat/Scripts"
 STARTUP_SCRIPT = "/media/fat/linux/user-startup.sh"
 CORENAME_FILE = "/tmp/CORENAME"
 MENU_CORE = "MENU"
-DEBUG=False
+DEBUG = False
 
 
 def debug(msg: str):
@@ -193,7 +193,7 @@ def start_service():
     if boot_track is not None:
         player.play(boot_track)
 
-    if len(player.all_tracks()) == 0:
+    if player.total_tracks() == 0:
         debug("No tracks available to play")
         return
 
@@ -224,7 +224,7 @@ def try_add_to_startup():
 
     with open(STARTUP_SCRIPT, "a") as f:
         f.write(
-            "\n# Startup BGM\n[[ -e /media/fat/Scripts/bgm.sh ]] && /media/fat/Scripts/bgm.sh start\n"
+            "\n# Startup BGM\n[[ -e /media/fat/Scripts/bgm.sh ]] && /media/fat/Scripts/bgm.sh start &\n"
         )
         return True
 
