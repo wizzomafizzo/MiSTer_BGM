@@ -331,7 +331,8 @@ if __name__ == "__main__":
         create_control_scripts()
         print("Created BGM control scripts.")
 
-    if len(os.listdir(MUSIC_FOLDER)) == 0:
+    player = Player()
+    if player.total_tracks() == 0:
         print(
             "Add music files to {} and re-run this script to start.".format(
                 MUSIC_FOLDER
