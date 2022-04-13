@@ -9,10 +9,11 @@ import math
 import socket
 import atexit
 
-MUSIC_FOLDER = "/media/fat/music"
+PLAYLIST = "random"
+# Uncomment the line below to use single track looping playlists
+# PLAYLIST = "loop"
 
-# special files to play on mister boot
-BOOT_NAMES = {"_boot.mp3", "_boot.ogg"}
+MUSIC_FOLDER = "/media/fat/music"
 # ratio of total tracks to keep in play history
 HISTORY_SIZE = 0.2
 
@@ -21,7 +22,7 @@ SCRIPTS_FOLDER = "/media/fat/Scripts"
 STARTUP_SCRIPT = "/media/fat/linux/user-startup.sh"
 CORENAME_FILE = "/tmp/CORENAME"
 MENU_CORE = "MENU"
-DEBUG = False
+DEBUG = True
 
 
 def debug(msg: str):
@@ -29,7 +30,12 @@ def debug(msg: str):
         print(msg)
 
 
+def random_index(list):
+    return random.randint(0, len(list) - 1)
+
+
 def wait_core_change():
+    # FIXME: this could turn very bad if the tmp file never appears
     if not os.path.exists(CORENAME_FILE):
         return "MENU"
 
@@ -79,9 +85,7 @@ class Player:
         tracks = []
 
         for track in os.listdir(MUSIC_FOLDER):
-            if track in BOOT_NAMES:
-                continue
-            elif self.is_valid_file(track):
+            if not track.startswith("_") and self.is_valid_file(track):
                 tracks.append(track)
 
         return tracks
@@ -121,10 +125,7 @@ class Player:
         if len(tracks) == 0:
             return
 
-        def random_index():
-            return random.randint(0, len(tracks) - 1)
-
-        index = random_index()
+        index = random_index(tracks)
         # avoid replaying recent tracks
         while tracks[index] in self.history:
             index = random_index()
@@ -175,23 +176,30 @@ class Player:
         remote = threading.Thread(target=listener)
         remote.start()
 
+    def boot_track(self):
+        tracks = []
 
-def get_boot_track():
-    track = None
-    for name in os.listdir(MUSIC_FOLDER):
-        if name in BOOT_NAMES:
-            track = os.path.join(MUSIC_FOLDER, name)
-            break
-    return track
+        for name in os.listdir(MUSIC_FOLDER):
+            if name.startswith("_") and self.is_valid_file(name):
+                tracks.append(os.path.join(MUSIC_FOLDER, name))
+
+        if len(tracks) > 0:
+            return tracks[random_index(tracks)]
+        else:
+            return None
+
+    def play_boot(self):
+        track = self.boot_track()
+        if track is not None:
+            debug("Playing boot track: {}".format(track))
+            self.play(track)
 
 
 def start_service():
     debug("Starting service...")
     player = Player()
 
-    boot_track = get_boot_track()
-    if boot_track is not None:
-        player.play(boot_track)
+    player.play_boot()
 
     if player.total_tracks() == 0:
         debug("No tracks available to play")
@@ -251,12 +259,19 @@ def create_control_scripts():
 
 # TODO: playlist and remote threads should respond appropriately to Ctrl-C and SIGTERM
 
+
+def cleanup():
+    if os.path.exists(SOCKET_FILE):
+        os.remove(SOCKET_FILE)
+
+
 if __name__ == "__main__":
     if len(sys.argv) == 2 and sys.argv[1] == "start":
         if os.path.exists(SOCKET_FILE):
             print("BGM service is already running, exiting...")
             sys.exit(1)
-        atexit.register(lambda: os.remove(SOCKET_FILE))
+
+        atexit.register(cleanup)
 
         start_service()
         sys.exit(0)

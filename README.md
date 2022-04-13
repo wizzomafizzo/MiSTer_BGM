@@ -18,4 +18,4 @@ BGM will stop playing when a core is launched, and resume playing when you get b
 
 The scripts `bgm_play`, `bgm_stop` and `bgm_skip` will be added the the `Scripts` menu, these can be used to manually control the player.
 
-Rename a music file to `_boot.mp3` or `_boot.ogg` to make BGM play this file first on MiSTer startup.
+Rename a music file with a `_` in front to make BGM play this file first on MiSTer startup (e.g. `_Mario 64 - Level Select.mp3`). This can be done with multiple files to have it pick a random one each time.
