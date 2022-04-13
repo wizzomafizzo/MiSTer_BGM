@@ -168,6 +168,29 @@ class Player:
         playlist = threading.Thread(target=playlist_loop)
         playlist.start()
 
+    def start_loop_playlist(self):
+        self.stop()
+        log("Starting loop playlist...")
+        self.end_playlist.clear()
+
+        track = self.random_track()
+
+        def playlist_loop():
+            while not self.end_playlist.is_set():
+                self.play(track)
+
+        playlist = threading.Thread(target=playlist_loop)
+        playlist.start()
+
+    def start_playlist(self, name):
+        if name == "random":
+            self.start_random_playlist()
+        elif name == "loop":
+            self.start_loop_playlist()
+        else:
+            # random playlist is fallback
+            self.start_random_playlist()
+
     def stop_playlist(self):
         self.end_playlist.set()
         self.stop()
@@ -181,7 +204,7 @@ class Player:
                 self.stop_playlist()
             elif cmd == "play":
                 self.stop_playlist()
-                self.start_random_playlist()
+                self.start_playlist(DEFAULT_PLAYLIST)
             elif cmd == "skip":
                 self.stop()
 
@@ -212,7 +235,7 @@ class Player:
     def play_boot(self):
         track = self.boot_track()
         if track is not None:
-            log("Playing boot track: {}".format(track))
+            log("Selected boot track: {}".format(track))
             self.play(track)
 
 
@@ -227,7 +250,7 @@ def start_service():
         return
 
     player.start_remote()
-    player.start_random_playlist()
+    player.start_playlist(DEFAULT_PLAYLIST)
     core = MENU_CORE
 
     while True:
@@ -236,7 +259,7 @@ def start_service():
         if core == new_core:
             pass
         elif new_core == MENU_CORE:
-            player.start_random_playlist()
+            player.start_playlist(DEFAULT_PLAYLIST)
         elif new_core != MENU_CORE:
             player.stop_playlist()
 
