@@ -6,7 +6,7 @@ Copy [bgm.sh](https://github.com/wizzomafizzo/MiSTer_BGM/raw/main/bgm.sh) to the
 
 Run `bgm` from the `Scripts` section of the MiSTer menu.
 
-Copy your .mp3 and .ogg files to the newly created `music` folder on your SD card. You can do this in advance by creating the music folder yourself.
+Copy your .mp3, .ogg or .wav files to the newly created `music` folder on your SD card. You can do this in advance by creating the music folder yourself.
 
 Reboot your MiSTer or re-run `bgm`.
 

@@ -76,8 +76,11 @@ class Player:
     def is_ogg(self, filename: str):
         return filename.lower().endswith(".ogg")
 
+    def is_wav(self, filename: str):
+        return filename.lower().endswith(".wav")
+
     def is_valid_file(self, filename: str):
-        return self.is_mp3(filename) or self.is_ogg(filename)
+        return self.is_mp3(filename) or self.is_ogg(filename) or self.is_wav(filename)
 
     def play_mp3(self, filename: str):
         args = ("mpg123", "--no-control", filename)
@@ -96,6 +99,14 @@ class Player:
 
     def play_ogg(self, filename: str):
         args = ("ogg123", filename)
+        # TODO: log output
+        self.player = subprocess.Popen(
+            args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+        )
+        self.player.wait()
+
+    def play_wav(self, filename: str):
+        args = ("aplay", filename)
         # TODO: log output
         self.player = subprocess.Popen(
             args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
@@ -140,6 +151,8 @@ class Player:
             self.play_mp3(filename)
         elif self.is_ogg(filename):
             self.play_ogg(filename)
+        elif self.is_wav(filename):
+            self.play_wav(filename)
 
     def random_track(self):
         tracks = self.all_tracks()
