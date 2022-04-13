@@ -8,26 +8,44 @@ import random
 import math
 import socket
 import atexit
+import configparser
+import datetime
 
-PLAYLIST = "random"
-# Uncomment the line below to use single track looping playlists
-# PLAYLIST = "loop"
-
+DEFAULT_PLAYLIST = "random"
 MUSIC_FOLDER = "/media/fat/music"
-# ratio of total tracks to keep in play history
-HISTORY_SIZE = 0.2
-
+HISTORY_SIZE = 0.2  # ratio of total tracks to keep in play history
 SOCKET_FILE = "/tmp/bgm.sock"
 SCRIPTS_FOLDER = "/media/fat/Scripts"
 STARTUP_SCRIPT = "/media/fat/linux/user-startup.sh"
 CORENAME_FILE = "/tmp/CORENAME"
+LOG_FILE = "/tmp/bgm.log"
+INI_FILENAME = "bgm.ini"
 MENU_CORE = "MENU"
-DEBUG = True
+DEBUG = False
 
 
-def debug(msg: str):
-    if DEBUG:
-        print(msg)
+# read ini file
+ini_file = os.path.join(MUSIC_FOLDER, INI_FILENAME)
+if os.path.exists(ini_file):
+    ini = configparser.ConfigParser()
+    ini.read(ini_file)
+    DEFAULT_PLAYLIST = ini.get("bgm", "playlist", fallback=DEFAULT_PLAYLIST)
+    DEBUG = ini.getboolean("bgm", "debug", fallback=DEBUG)
+else:
+    # create a default ini
+    if os.path.exists(MUSIC_FOLDER):
+        with open(ini_file, "w") as f:
+            f.write("[bgm]\nplaylist = random\ndebug = no\n")
+
+
+def log(msg: str):
+    if not DEBUG:
+        return
+    print(msg)
+    with open(LOG_FILE, "a") as f:
+        f.write(
+            "[{}] {}\n".format(datetime.datetime.isoformat(datetime.datetime.now()), msg)
+        )
 
 
 def random_index(list):
@@ -37,8 +55,9 @@ def random_index(list):
 def wait_core_change():
     # FIXME: this could turn very bad if the tmp file never appears
     if not os.path.exists(CORENAME_FILE):
-        return "MENU"
+        return MENU_CORE
 
+    # TODO: log output
     args = ("inotifywait", "-e", "modify", CORENAME_FILE)
     subprocess.run(args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
@@ -65,6 +84,7 @@ class Player:
         self.player = subprocess.Popen(
             args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT
         )
+        # TODO: log output
         # workaround for a strange issue with mpg123 on MiSTer
         # some mp3 files will play but cause mpg123 to hang at the end
         # this may be fixed when MiSTer ships with a newer version
@@ -76,6 +96,7 @@ class Player:
 
     def play_ogg(self, filename: str):
         args = ("ogg123", filename)
+        # TODO: log output
         self.player = subprocess.Popen(
             args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
         )
@@ -111,7 +132,7 @@ class Player:
 
         if self.is_valid_file(filename):
             self.add_history(filename)
-            debug("Now playing: {}".format(filename))
+            log("Now playing: {}".format(filename))
         else:
             return
 
@@ -137,7 +158,7 @@ class Player:
 
     def start_random_playlist(self):
         self.stop()
-        debug("Starting random playlist...")
+        log("Starting random playlist...")
         self.end_playlist.clear()
 
         def playlist_loop():
@@ -172,7 +193,7 @@ class Player:
                 handler(data.decode())
                 conn.close()
 
-        debug("Starting remote...")
+        log("Starting remote...")
         remote = threading.Thread(target=listener)
         remote.start()
 
@@ -191,18 +212,18 @@ class Player:
     def play_boot(self):
         track = self.boot_track()
         if track is not None:
-            debug("Playing boot track: {}".format(track))
+            log("Playing boot track: {}".format(track))
             self.play(track)
 
 
 def start_service():
-    debug("Starting service...")
+    log("Starting service...")
     player = Player()
 
     player.play_boot()
 
     if player.total_tracks() == 0:
-        debug("No tracks available to play")
+        log("No tracks available to play")
         return
 
     player.start_remote()
