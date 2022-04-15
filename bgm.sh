@@ -329,34 +329,23 @@ def try_add_to_startup():
 
     with open(STARTUP_SCRIPT, "r") as f:
         if "Startup BGM" in f.read():
-            return False
+            return
 
     with open(STARTUP_SCRIPT, "a") as f:
         bgm = os.path.join(SCRIPTS_FOLDER, "bgm.sh")
         f.write("\n# Startup BGM\n[[ -e {} ]] && {} $1 &\n".format(bgm, bgm))
-        return True
+        log("Added service to startup script.", True)
 
 
-# TODO: single template for these and check if socket exists
 # TODO: send commands to socket in script instead of socat?
-def create_control_scripts():
-    play_file = (
-        '#!/usr/bin/env bash\n\necho -n "play" | socat - UNIX-CONNECT:/tmp/bgm.sock'
-    )
-    with open(os.path.join(SCRIPTS_FOLDER, "bgm_play.sh"), "w") as f:
-        f.write(play_file)
-
-    stop_file = (
-        '#!/usr/bin/env bash\n\necho -n "stop" | socat - UNIX-CONNECT:/tmp/bgm.sock'
-    )
-    with open(os.path.join(SCRIPTS_FOLDER, "bgm_stop.sh"), "w") as f:
-        f.write(stop_file)
-
-    skip_file = (
-        '#!/usr/bin/env bash\n\necho -n "skip" | socat - UNIX-CONNECT:/tmp/bgm.sock'
-    )
-    with open(os.path.join(SCRIPTS_FOLDER, "bgm_skip.sh"), "w") as f:
-        f.write(skip_file)
+def try_create_control_scripts():
+    template = '#!/usr/bin/env bash\n\necho -n "{}" | socat - UNIX-CONNECT:/tmp/bgm.sock\n'
+    for cmd in ("play", "stop", "skip"):
+        script = os.path.join(SCRIPTS_FOLDER, "bgm_{}.sh".format(cmd))
+        if not os.path.exists(script):
+            with open(script, "w") as f:
+                f.write(template.format(cmd))
+                log("Created {} script.".format(cmd), True)
 
 
 # TODO: playlist and remote threads should respond appropriately to Ctrl-C and SIGTERM
@@ -383,13 +372,8 @@ if __name__ == "__main__":
     if not os.path.exists(MUSIC_FOLDER):
         os.mkdir(MUSIC_FOLDER)
         log("Created music folder.", True)
-
-    if try_add_to_startup():
-        log("Added to MiSTer startup script.", True)
-
-    if not os.path.exists(os.path.join(SCRIPTS_FOLDER, "bgm_play.sh")):
-        create_control_scripts()
-        log("Created BGM control scripts.", True)
+    try_add_to_startup()
+    try_create_control_scripts()
 
     player = Player()
     if player.total_tracks() == 0:
