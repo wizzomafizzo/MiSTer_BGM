@@ -25,7 +25,7 @@ MENU_CORE = "MENU"
 DEBUG = False
 
 
-# TODO: way to make it run sooner? put in an faq
+# TODO: way to make it run sooner? put in docs how to add service file
 # TODO: remote control http server, separate file
 # TODO: folder based playlists
 # TODO: internet radio?
@@ -44,15 +44,16 @@ else:
             f.write("[bgm]\nplaylist = random\ndebug = no\n")
 
 
-# TODO: option to always print
-def log(msg: str):
-    if not DEBUG:
-        return
-    print(msg)
-    with open(LOG_FILE, "a") as f:
-        f.write(
-            "[{}] {}\n".format(datetime.datetime.isoformat(datetime.datetime.now()), msg)
-        )
+def log(msg: str, always_print=False):
+    if always_print or DEBUG:
+        print(msg)
+    if DEBUG:
+        with open(LOG_FILE, "a") as f:
+            f.write(
+                "[{}] {}\n".format(
+                    datetime.datetime.isoformat(datetime.datetime.now()), msg
+                )
+            )
 
 
 def random_index(list):
@@ -78,7 +79,6 @@ def wait_core_change():
         if get_core() is None:
             log("No CORENAME file found")
             return None
-
 
     # TODO: log output
     # TODO: check for errors from this
@@ -333,9 +333,7 @@ def try_add_to_startup():
 
     with open(STARTUP_SCRIPT, "a") as f:
         bgm = os.path.join(SCRIPTS_FOLDER, "bgm.sh")
-        f.write(
-            "\n# Startup BGM\n[[ -e {} ]] && {} $1 &\n".format(bgm, bgm)
-        )
+        f.write("\n# Startup BGM\n[[ -e {} ]] && {} $1 &\n".format(bgm, bgm))
         return True
 
 
@@ -373,7 +371,7 @@ if __name__ == "__main__":
     if len(sys.argv) == 2:
         if sys.argv[1] == "start":
             if os.path.exists(SOCKET_FILE):
-                print("BGM service is already running, exiting...")
+                log("BGM service is already running, exiting...", True)
                 sys.exit(1)
             atexit.register(cleanup)
             start_service()
@@ -384,28 +382,28 @@ if __name__ == "__main__":
 
     if not os.path.exists(MUSIC_FOLDER):
         os.mkdir(MUSIC_FOLDER)
-        print("Created music folder.")
+        log("Created music folder.", True)
 
     if try_add_to_startup():
-        print("Added to MiSTer startup script.")
+        log("Added to MiSTer startup script.", True)
 
     if not os.path.exists(os.path.join(SCRIPTS_FOLDER, "bgm_play.sh")):
         create_control_scripts()
-        print("Created BGM control scripts.")
+        log("Created BGM control scripts.", True)
 
     player = Player()
     if player.total_tracks() == 0:
-        print(
+        log(
             "Add music files to {} and re-run this script to start.".format(
                 MUSIC_FOLDER
-            )
+            ), True
         )
         sys.exit(0)
     else:
         if not os.path.exists(SOCKET_FILE):
-            print("Starting BGM service...")
+            log("Starting BGM service...", True)
             os.system("{} start &".format(os.path.join(SCRIPTS_FOLDER, "bgm.sh")))
             sys.exit(0)
         else:
-            print("BGM is already running.")
+            log("BGM is already running.", True)
             sys.exit(0)
