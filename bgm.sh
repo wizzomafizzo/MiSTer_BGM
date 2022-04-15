@@ -24,6 +24,8 @@ MENU_CORE = "MENU"
 DEBUG = False
 
 
+# TODO: way to make it run sooner? put in an faq
+
 # read ini file
 ini_file = os.path.join(MUSIC_FOLDER, INI_FILENAME)
 if os.path.exists(ini_file):
@@ -52,6 +54,9 @@ def random_index(list):
     return random.randint(0, len(list) - 1)
 
 
+# TODO: get current core fn
+
+
 def wait_core_change():
     # FIXME: this could turn very bad if the tmp file never appears
     if not os.path.exists(CORENAME_FILE):
@@ -65,6 +70,9 @@ def wait_core_change():
         return str(f.read())
 
 
+# TODO: vgmplay support
+# TODO: disable playlist (boot sound only)
+# TODO: single track loop options
 class Player:
     player = None
     end_playlist = threading.Event()
@@ -79,6 +87,7 @@ class Player:
     def is_wav(self, filename: str):
         return filename.lower().endswith(".wav")
 
+    # TODO: this might get crazy if vgmplay is added. use a regex?
     def is_valid_file(self, filename: str):
         return self.is_mp3(filename) or self.is_ogg(filename) or self.is_wav(filename)
 
@@ -88,11 +97,13 @@ class Player:
             args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT
         )
         # TODO: log output
+        # TODO: change to communicate?
         # workaround for a strange issue with mpg123 on MiSTer
         # some mp3 files will play but cause mpg123 to hang at the end
         # this may be fixed when MiSTer ships with a newer version
         while self.player is not None:
             line = self.player.stdout.readline()
+            # TODO: or poll
             if "finished." in line.decode():
                 self.stop()
                 break
@@ -256,6 +267,7 @@ def start_service():
     log("Starting service...")
     player = Player()
 
+    # FIXME: make non-blocking, this can run past a core launch and bug out
     player.play_boot()
 
     if player.total_tracks() == 0:
@@ -281,19 +293,23 @@ def start_service():
 
 def try_add_to_startup():
     if not os.path.exists(STARTUP_SCRIPT):
-        return False
+        # create a new startup script
+        with open(STARTUP_SCRIPT, "w") as f:
+            f.write("#!/bin/sh\n")
 
     with open(STARTUP_SCRIPT, "r") as f:
         if "Startup BGM" in f.read():
             return False
 
     with open(STARTUP_SCRIPT, "a") as f:
+        bgm = os.path.join(SCRIPTS_FOLDER, "bgm.sh")
         f.write(
-            "\n# Startup BGM\n[[ -e /media/fat/Scripts/bgm.sh ]] && /media/fat/Scripts/bgm.sh start &\n"
+            "\n# Startup BGM\n[[ -e {} ]] && {} $1 &\n".format(bgm, bgm)
         )
         return True
 
 
+# TODO: single template for these and check if socket exists
 def create_control_scripts():
     play_file = (
         '#!/usr/bin/env bash\n\necho -n "play" | socat - UNIX-CONNECT:/tmp/bgm.sock'
@@ -323,15 +339,17 @@ def cleanup():
 
 
 if __name__ == "__main__":
-    if len(sys.argv) == 2 and sys.argv[1] == "start":
-        if os.path.exists(SOCKET_FILE):
-            print("BGM service is already running, exiting...")
-            sys.exit(1)
-
-        atexit.register(cleanup)
-
-        start_service()
-        sys.exit(0)
+    if len(sys.argv) == 2:
+        if sys.argv[1] == "start":
+            if os.path.exists(SOCKET_FILE):
+                print("BGM service is already running, exiting...")
+                sys.exit(1)
+            atexit.register(cleanup)
+            start_service()
+            sys.exit(0)
+        elif sys.argv[1] == "stop":
+            # TODO: don't think it really matters in practice but a stop service would be nice
+            sys.exit(0)
 
     if not os.path.exists(MUSIC_FOLDER):
         os.mkdir(MUSIC_FOLDER)
