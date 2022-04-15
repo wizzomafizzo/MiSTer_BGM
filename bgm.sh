@@ -10,6 +10,7 @@ import socket
 import atexit
 import configparser
 import datetime
+import time
 
 DEFAULT_PLAYLIST = "random"
 MUSIC_FOLDER = "/media/fat/music"
@@ -25,6 +26,9 @@ DEBUG = False
 
 
 # TODO: way to make it run sooner? put in an faq
+# TODO: remote control http server, separate file
+# TODO: folder based playlists
+# TODO: internet radio?
 
 # read ini file
 ini_file = os.path.join(MUSIC_FOLDER, INI_FILENAME)
@@ -40,6 +44,7 @@ else:
             f.write("[bgm]\nplaylist = random\ndebug = no\n")
 
 
+# TODO: option to always print
 def log(msg: str):
     if not DEBUG:
         return
@@ -54,27 +59,41 @@ def random_index(list):
     return random.randint(0, len(list) - 1)
 
 
-# TODO: get current core fn
-
-
-def wait_core_change():
-    # FIXME: this could turn very bad if the tmp file never appears
+def get_core():
     if not os.path.exists(CORENAME_FILE):
-        return MENU_CORE
-
-    # TODO: log output
-    args = ("inotifywait", "-e", "modify", CORENAME_FILE)
-    subprocess.run(args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        return None
 
     with open(CORENAME_FILE) as f:
         return str(f.read())
 
 
+def wait_core_change():
+    if get_core() is None:
+        log("CORENAME file does not exist, retrying...")
+        # keep trying to read it for a little while
+        attempts = 0
+        while get_core() is None and attempts <= 15:
+            time.sleep(1)
+            attempts += 1
+        if get_core() is None:
+            log("No CORENAME file found")
+            return None
+
+
+    # TODO: log output
+    # TODO: check for errors from this
+    args = ("inotifywait", "-e", "modify", CORENAME_FILE)
+    subprocess.run(args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+    return get_core()
+
+
 # TODO: vgmplay support
 # TODO: disable playlist (boot sound only)
-# TODO: single track loop options
+# TODO: per track loop options (filename?)
 class Player:
     player = None
+    # TODO: current playlist
     end_playlist = threading.Event()
     history = []
 
@@ -165,7 +184,7 @@ class Player:
         elif self.is_wav(filename):
             self.play_wav(filename)
 
-    def random_track(self):
+    def get_random_track(self):
         tracks = self.all_tracks()
         if len(tracks) == 0:
             return
@@ -178,7 +197,7 @@ class Player:
         return os.path.join(MUSIC_FOLDER, tracks[index])
 
     def play_random(self):
-        self.play(self.random_track())
+        self.play(self.get_random_track())
 
     def start_random_playlist(self):
         self.stop()
@@ -197,7 +216,7 @@ class Player:
         log("Starting loop playlist...")
         self.end_playlist.clear()
 
-        track = self.random_track()
+        track = self.get_random_track()
 
         def playlist_loop():
             while not self.end_playlist.is_set():
@@ -232,6 +251,7 @@ class Player:
             elif cmd == "skip":
                 self.stop()
 
+        # TODO: need to signal this somehow to exit
         def listener():
             while True:
                 s.listen()
@@ -244,20 +264,20 @@ class Player:
         remote = threading.Thread(target=listener)
         remote.start()
 
-    def boot_track(self):
-        tracks = []
+    def get_boot_track(self):
+        boot_tracks = []
 
         for name in os.listdir(MUSIC_FOLDER):
             if name.startswith("_") and self.is_valid_file(name):
-                tracks.append(os.path.join(MUSIC_FOLDER, name))
+                boot_tracks.append(os.path.join(MUSIC_FOLDER, name))
 
-        if len(tracks) > 0:
-            return tracks[random_index(tracks)]
+        if len(boot_tracks) > 0:
+            return boot_tracks[random_index(boot_tracks)]
         else:
             return None
 
     def play_boot(self):
-        track = self.boot_track()
+        track = self.get_boot_track()
         if track is not None:
             log("Selected boot track: {}".format(track))
             self.play(track)
@@ -266,26 +286,36 @@ class Player:
 def start_service():
     log("Starting service...")
     player = Player()
+    player.start_remote()
 
-    # FIXME: make non-blocking, this can run past a core launch and bug out
+    # TODO: make this non-blocking so it can be cut off during core launch?
     player.play_boot()
 
     if player.total_tracks() == 0:
         log("No tracks available to play")
         return
 
-    player.start_remote()
-    player.start_playlist(DEFAULT_PLAYLIST)
-    core = MENU_CORE
+    core = get_core()
+    # don't start playing if the boot track ran into a core launch
+    # do start playing for a bit if the CORENAME file is still being created
+    if core == MENU_CORE or core is None:
+        player.start_playlist(DEFAULT_PLAYLIST)
 
     while True:
         new_core = wait_core_change()
 
-        if core == new_core:
+        if new_core is None:
+            log("CORENAME file is missing, exiting...")
+            player.stop_playlist()
+            # TODO: this won't actually exit yet until we can signal the socket thread
+            sys.exit(1)
+        elif core == new_core:
             pass
         elif new_core == MENU_CORE:
+            log("Switched to menu core, starting playlist...")
             player.start_playlist(DEFAULT_PLAYLIST)
         elif new_core != MENU_CORE:
+            log("Exited menu core, stopping playlist...")
             player.stop_playlist()
 
         core = new_core
@@ -310,6 +340,7 @@ def try_add_to_startup():
 
 
 # TODO: single template for these and check if socket exists
+# TODO: send commands to socket in script instead of socat?
 def create_control_scripts():
     play_file = (
         '#!/usr/bin/env bash\n\necho -n "play" | socat - UNIX-CONNECT:/tmp/bgm.sock'
