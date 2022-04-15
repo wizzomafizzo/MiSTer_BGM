@@ -93,7 +93,7 @@ def wait_core_change():
 # TODO: per track loop options (filename?)
 class Player:
     player = None
-    # TODO: current playlist
+    # TODO: current playlist, and ability to change it
     end_playlist = threading.Event()
     history = []
 
@@ -115,33 +115,36 @@ class Player:
         self.player = subprocess.Popen(
             args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT
         )
-        # TODO: log output
-        # TODO: change to communicate?
         # workaround for a strange issue with mpg123 on MiSTer
         # some mp3 files will play but cause mpg123 to hang at the end
         # this may be fixed when MiSTer ships with a newer version
         while self.player is not None:
             line = self.player.stdout.readline()
-            # TODO: or poll
-            if "finished." in line.decode():
+            output = line.decode().rstrip()
+            log(output)
+            if "finished." in output or self.player.poll() is not None:
                 self.stop()
                 break
 
     def play_ogg(self, filename: str):
         args = ("ogg123", filename)
-        # TODO: log output
         self.player = subprocess.Popen(
-            args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+            args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT
         )
-        self.player.wait()
+        while self.player.poll() is None:
+            line = self.player.stdout.readline()
+            log(line.decode().rstrip())
+        self.stop()
 
     def play_wav(self, filename: str):
         args = ("aplay", filename)
-        # TODO: log output
         self.player = subprocess.Popen(
-            args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+            args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT
         )
-        self.player.wait()
+        while self.player.poll() is None:
+            line = self.player.stdout.readline()
+            log(line.decode().rstrip())
+        self.stop()
 
     def all_tracks(self):
         tracks = []
@@ -339,7 +342,9 @@ def try_add_to_startup():
 
 # TODO: send commands to socket in script instead of socat?
 def try_create_control_scripts():
-    template = '#!/usr/bin/env bash\n\necho -n "{}" | socat - UNIX-CONNECT:/tmp/bgm.sock\n'
+    template = (
+        '#!/usr/bin/env bash\n\necho -n "{}" | socat - UNIX-CONNECT:/tmp/bgm.sock\n'
+    )
     for cmd in ("play", "stop", "skip"):
         script = os.path.join(SCRIPTS_FOLDER, "bgm_{}.sh".format(cmd))
         if not os.path.exists(script):
@@ -380,7 +385,8 @@ if __name__ == "__main__":
         log(
             "Add music files to {} and re-run this script to start.".format(
                 MUSIC_FOLDER
-            ), True
+            ),
+            True,
         )
         sys.exit(0)
     else:
