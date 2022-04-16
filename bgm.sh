@@ -7,15 +7,16 @@ import threading
 import random
 import math
 import socket
-import atexit
 import configparser
 import datetime
 import time
+import signal
 
 DEFAULT_PLAYLIST = "random"
 MUSIC_FOLDER = "/media/fat/music"
 HISTORY_SIZE = 0.2  # ratio of total tracks to keep in play history
 SOCKET_FILE = "/tmp/bgm.sock"
+MESSAGE_SIZE = 32
 SCRIPTS_FOLDER = "/media/fat/Scripts"
 STARTUP_SCRIPT = "/media/fat/linux/user-startup.sh"
 CORENAME_FILE = "/tmp/CORENAME"
@@ -45,6 +46,8 @@ else:
 
 
 def log(msg: str, always_print=False):
+    if msg == "":
+        return
     if always_print or DEBUG:
         print(msg)
     if DEBUG:
@@ -80,12 +83,16 @@ def wait_core_change():
             log("No CORENAME file found")
             return None
 
-    # TODO: log output
     # TODO: check for errors from this
     args = ("inotifywait", "-e", "modify", CORENAME_FILE)
-    subprocess.run(args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    monitor = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    while monitor is not None and monitor.poll() is None:
+            line = monitor.stdout.readline()
+            log(line.decode().rstrip())
 
-    return get_core()
+    core = get_core()
+    log("Core change to: {}".format(core))
+    return core
 
 
 # TODO: vgmplay support
@@ -122,7 +129,7 @@ class Player:
             line = self.player.stdout.readline()
             output = line.decode().rstrip()
             log(output)
-            if "finished." in output or self.player.poll() is not None:
+            if "finished." in output or self.player is None or self.player.poll() is not None:
                 self.stop()
                 break
 
@@ -131,7 +138,7 @@ class Player:
         self.player = subprocess.Popen(
             args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT
         )
-        while self.player.poll() is None:
+        while self.player is not None and self.player.poll() is None:
             line = self.player.stdout.readline()
             log(line.decode().rstrip())
         self.stop()
@@ -141,7 +148,7 @@ class Player:
         self.player = subprocess.Popen(
             args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT
         )
-        while self.player.poll() is None:
+        while self.player is not None and self.player.poll() is None:
             line = self.player.stdout.readline()
             log(line.decode().rstrip())
         self.stop()
@@ -210,6 +217,7 @@ class Player:
         def playlist_loop():
             while not self.end_playlist.is_set():
                 self.play_random()
+            log("Random playlist ended")
 
         playlist = threading.Thread(target=playlist_loop)
         playlist.start()
@@ -224,6 +232,7 @@ class Player:
         def playlist_loop():
             while not self.end_playlist.is_set():
                 self.play(track)
+            log("Loop playlist ended")
 
         playlist = threading.Thread(target=playlist_loop)
         playlist.start()
@@ -246,6 +255,7 @@ class Player:
         s.bind(SOCKET_FILE)
 
         def handler(cmd):
+            log("Received command: {}".format(cmd))
             if cmd == "stop":
                 self.stop_playlist()
             elif cmd == "play":
@@ -253,15 +263,22 @@ class Player:
                 self.start_playlist(DEFAULT_PLAYLIST)
             elif cmd == "skip":
                 self.stop()
+            elif cmd == "pid":
+                return os.getpid()
 
-        # TODO: need to signal this somehow to exit
         def listener():
             while True:
                 s.listen()
                 conn, addr = s.accept()
-                data = conn.recv(32)
-                handler(data.decode())
+                data = conn.recv(MESSAGE_SIZE).decode()
+                if data == "quit":
+                    break
+                response = handler(data)
+                if response is not None:
+                    conn.send(str(response).encode())
                 conn.close()
+            s.close()
+            log("Remote stopped")
 
         log("Starting remote...")
         remote = threading.Thread(target=listener)
@@ -286,11 +303,30 @@ class Player:
             self.play(track)
 
 
-def start_service():
-    log("Starting service...")
-    player = Player()
-    player.start_remote()
+def send_socket(msg: str):
+    if not os.path.exists(SOCKET_FILE):
+        return
+    s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    s.connect(SOCKET_FILE)
+    s.send(msg.encode())
+    response = s.recv(MESSAGE_SIZE)
+    s.close()
+    if len(response) > 0:
+        return response.decode()
+    
 
+def cleanup(player: Player):
+    if player is not None:
+        player.stop_playlist()
+        send_socket("quit")
+    if os.path.exists(SOCKET_FILE):
+        os.remove(SOCKET_FILE)
+
+
+def start_service(player: Player):
+    log("Starting service...")
+
+    player.start_remote()
     # TODO: make this non-blocking so it can be cut off during core launch?
     player.play_boot()
 
@@ -309,10 +345,9 @@ def start_service():
 
         if new_core is None:
             log("CORENAME file is missing, exiting...")
-            player.stop_playlist()
-            # TODO: this won't actually exit yet until we can signal the socket thread
-            sys.exit(1)
-        elif core == new_core:
+            break
+        
+        if core == new_core:
             pass
         elif new_core == MENU_CORE:
             log("Switched to menu core, starting playlist...")
@@ -340,25 +375,17 @@ def try_add_to_startup():
         log("Added service to startup script.", True)
 
 
-# TODO: send commands to socket in script instead of socat?
+# TODO: these scripts should say if socket doesn't exist
 def try_create_control_scripts():
     template = (
-        '#!/usr/bin/env bash\n\necho -n "{}" | socat - UNIX-CONNECT:/tmp/bgm.sock\n'
+        '#!/usr/bin/env bash\n\necho -n "{}" | socat - UNIX-CONNECT:{}\n'
     )
     for cmd in ("play", "stop", "skip"):
-        script = os.path.join(SCRIPTS_FOLDER, "bgm_{}.sh".format(cmd))
+        script = os.path.join(SCRIPTS_FOLDER, "bgm_{}.sh".format(cmd, SOCKET_FILE))
         if not os.path.exists(script):
             with open(script, "w") as f:
                 f.write(template.format(cmd))
                 log("Created {} script.".format(cmd), True)
-
-
-# TODO: playlist and remote threads should respond appropriately to Ctrl-C and SIGTERM
-
-
-def cleanup():
-    if os.path.exists(SOCKET_FILE):
-        os.remove(SOCKET_FILE)
 
 
 if __name__ == "__main__":
@@ -366,13 +393,24 @@ if __name__ == "__main__":
         if sys.argv[1] == "start":
             if os.path.exists(SOCKET_FILE):
                 log("BGM service is already running, exiting...", True)
-                sys.exit(1)
-            atexit.register(cleanup)
-            start_service()
-            sys.exit(0)
+                sys.exit()
+            def stop(sn=0, f=0):
+                log("Stopping service ({})".format(sn))
+                cleanup(player)
+                sys.exit()
+            signal.signal(signal.SIGINT, stop)
+            signal.signal(signal.SIGTERM, stop)
+            player = Player()
+            start_service(player)
+            stop()
         elif sys.argv[1] == "stop":
-            # TODO: don't think it really matters in practice but a stop service would be nice
-            sys.exit(0)
+            if not os.path.exists(SOCKET_FILE):
+                log("BGM service is not running", True)
+                sys.exit()
+            pid = send_socket("pid")
+            if pid is not None:
+                os.system("kill {}".format(pid))
+            sys.exit()
 
     if not os.path.exists(MUSIC_FOLDER):
         os.mkdir(MUSIC_FOLDER)
@@ -388,12 +426,12 @@ if __name__ == "__main__":
             ),
             True,
         )
-        sys.exit(0)
+        sys.exit()
     else:
         if not os.path.exists(SOCKET_FILE):
             log("Starting BGM service...", True)
             os.system("{} start &".format(os.path.join(SCRIPTS_FOLDER, "bgm.sh")))
-            sys.exit(0)
+            sys.exit()
         else:
             log("BGM is already running.", True)
-            sys.exit(0)
+            sys.exit()
