@@ -29,7 +29,9 @@ DEBUG = False
 # TODO: way to make it run sooner? put in docs how to add service file
 # TODO: remote control http server, separate file
 # TODO: folder based playlists
-# TODO: internet radio?
+# TODO: internet radio/playlist files
+# TODO: "disabled" playlist
+# TODO: disable/enable startup
 
 # read ini file
 ini_file = os.path.join(MUSIC_FOLDER, INI_FILENAME)
@@ -83,12 +85,15 @@ def wait_core_change():
             log("No CORENAME file found")
             return None
 
-    # TODO: check for errors from this
     args = ("inotifywait", "-e", "modify", CORENAME_FILE)
     monitor = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     while monitor is not None and monitor.poll() is None:
             line = monitor.stdout.readline()
             log(line.decode().rstrip())
+
+    if monitor.returncode != 0:
+        log("Error when running inotify watch")
+        return None
 
     core = get_core()
     log("Core change to: {}".format(core))
