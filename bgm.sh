@@ -14,6 +14,7 @@ import signal
 import re
 
 DEFAULT_PLAYBACK = "random"
+DEFAULT_PLAYLIST = None
 MUSIC_FOLDER = "/media/fat/music"
 ENABLE_STARTUP = True
 HISTORY_SIZE = 0.2  # ratio of total tracks to keep in play history
@@ -35,6 +36,8 @@ DEBUG = False
 # TODO: make "playlist" option specify folder
 # TODO: disable control script creation config
 # TODO: change playback and playist through socket
+# TODO: per track loop options (filename?)
+
 
 # read ini file
 ini_file = os.path.join(MUSIC_FOLDER, INI_FILENAME)
@@ -42,13 +45,16 @@ if os.path.exists(ini_file):
     ini = configparser.ConfigParser()
     ini.read(ini_file)
     DEFAULT_PLAYBACK = ini.get("bgm", "playback", fallback=DEFAULT_PLAYBACK)
+    DEFAULT_PLAYLIST = ini.get("bgm", "playlist", fallback=DEFAULT_PLAYLIST)
     DEBUG = ini.getboolean("bgm", "debug", fallback=DEBUG)
     ENABLE_STARTUP = ini.getboolean("bgm", "startup", fallback=ENABLE_STARTUP)
 else:
     # create a default ini
     if os.path.exists(MUSIC_FOLDER):
         with open(ini_file, "w") as f:
-            f.write("[bgm]\nplayback = random\nplaylist = none\nstartup = yes\ndebug = no\n")
+            f.write(
+                "[bgm]\nplayback = random\nplaylist = none\nstartup = yes\ndebug = no\n"
+            )
 
 
 def log(msg: str, always_print=False):
@@ -105,11 +111,9 @@ def wait_core_change():
     return core
 
 
-# TODO: disable playlist (boot sound only)
-# TODO: per track loop options (filename?)
 class Player:
     player = None
-    # TODO: current playlist/folder
+    playlist = DEFAULT_PLAYLIST
     end_playlist = threading.Event()
     history = []
 
@@ -398,11 +402,11 @@ def try_add_to_startup():
 
     with open(STARTUP_SCRIPT, "a") as f:
         bgm = os.path.join(SCRIPTS_FOLDER, "bgm.sh")
-        f.write("\n# Startup BGM\n[[ -e {} ]] && {} $1 &\n".format(bgm, bgm))
+        f.write("\n# Startup BGM\n[[ -e {} ]] && {} $1\n".format(bgm, bgm))
         log("Added service to startup script.", True)
 
 
-# TODO: these scripts should say if socket doesn't exist
+# FIXME: these scripts should say if socket doesn't exist
 def try_create_control_scripts():
     template = '#!/usr/bin/env bash\n\necho -n "{}" | socat - UNIX-CONNECT:{}\n'
     for cmd in ("play", "stop", "skip"):
@@ -415,11 +419,7 @@ def try_create_control_scripts():
 
 if __name__ == "__main__":
     if len(sys.argv) == 2:
-        if sys.argv[1] == "start" or sys.argv[1] == "force-start":
-            if sys.argv[1] == "start" and not ENABLE_STARTUP:
-                log("Auto-start is disabled in configuration", True)
-                sys.exit()
-
+        if sys.argv[1] == "start-service":
             if os.path.exists(SOCKET_FILE):
                 log("BGM service is already running, exiting...", True)
                 sys.exit()
@@ -434,6 +434,14 @@ if __name__ == "__main__":
             player = Player()
             start_service(player)
             stop()
+        elif sys.argv[1] == "start":
+            if not ENABLE_STARTUP:
+                log("Auto-start is disabled in configuration", True)
+                sys.exit()
+            os.system(
+                "{} start-service &".format(os.path.join(SCRIPTS_FOLDER, "bgm.sh"))
+            )
+            sys.exit()
         elif sys.argv[1] == "stop":
             if not os.path.exists(SOCKET_FILE):
                 log("BGM service is not running", True)
@@ -461,7 +469,9 @@ if __name__ == "__main__":
     else:
         if not os.path.exists(SOCKET_FILE):
             log("Starting BGM service...", True)
-            os.system("{} force-start &".format(os.path.join(SCRIPTS_FOLDER, "bgm.sh")))
+            os.system(
+                "{} start-service &".format(os.path.join(SCRIPTS_FOLDER, "bgm.sh"))
+            )
             sys.exit()
         else:
             log("BGM is already running.", True)
