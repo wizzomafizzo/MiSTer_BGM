@@ -15,6 +15,7 @@ import re
 
 DEFAULT_PLAYLIST = "random"
 MUSIC_FOLDER = "/media/fat/music"
+ENABLE_STARTUP = True
 HISTORY_SIZE = 0.2  # ratio of total tracks to keep in play history
 SOCKET_FILE = "/tmp/bgm.sock"
 MESSAGE_SIZE = 32
@@ -43,11 +44,12 @@ if os.path.exists(ini_file):
     ini.read(ini_file)
     DEFAULT_PLAYLIST = ini.get("bgm", "playlist", fallback=DEFAULT_PLAYLIST)
     DEBUG = ini.getboolean("bgm", "debug", fallback=DEBUG)
+    ENABLE_STARTUP = ini.getboolean("bgm", "startup", fallback=ENABLE_STARTUP)
 else:
     # create a default ini
     if os.path.exists(MUSIC_FOLDER):
         with open(ini_file, "w") as f:
-            f.write("[bgm]\nplaylist = random\ndebug = no\n")
+            f.write("[bgm]\nplaylist = random\nstartup = yes\ndebug = no\n")
 
 
 def log(msg: str, always_print=False):
@@ -88,6 +90,7 @@ def wait_core_change():
             log("No CORENAME file found")
             return None
 
+    # FIXME: not a big deal, but this process can be orphaned during service shutdown
     args = ("inotifywait", "-e", "modify", CORENAME_FILE)
     monitor = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     while monitor is not None and monitor.poll() is None:
@@ -349,7 +352,8 @@ def start_service(player: Player):
     log("Starting service...")
 
     player.start_remote()
-    # TODO: make this non-blocking so it can be cut off during core launch?
+    # FIXME: make this non-blocking so it can be cut off during core launch
+    #        this only affects people with really long boot sounds
     player.play_boot()
 
     if player.total_tracks() == 0:
@@ -410,7 +414,11 @@ def try_create_control_scripts():
 
 if __name__ == "__main__":
     if len(sys.argv) == 2:
-        if sys.argv[1] == "start":
+        if sys.argv[1] == "start" or sys.argv[1] == "force-start":
+            if sys.argv[1] == "start" and not ENABLE_STARTUP:
+                log("Auto-start is disabled in configuration", True)
+                sys.exit()
+
             if os.path.exists(SOCKET_FILE):
                 log("BGM service is already running, exiting...", True)
                 sys.exit()
@@ -452,7 +460,7 @@ if __name__ == "__main__":
     else:
         if not os.path.exists(SOCKET_FILE):
             log("Starting BGM service...", True)
-            os.system("{} start &".format(os.path.join(SCRIPTS_FOLDER, "bgm.sh")))
+            os.system("{} force-start &".format(os.path.join(SCRIPTS_FOLDER, "bgm.sh")))
             sys.exit()
         else:
             log("BGM is already running.", True)
