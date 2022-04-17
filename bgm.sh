@@ -13,7 +13,7 @@ import time
 import signal
 import re
 
-DEFAULT_PLAYLIST = "random"
+DEFAULT_PLAYBACK = "random"
 MUSIC_FOLDER = "/media/fat/music"
 ENABLE_STARTUP = True
 HISTORY_SIZE = 0.2  # ratio of total tracks to keep in play history
@@ -32,24 +32,23 @@ DEBUG = False
 # TODO: remote control http server, separate file
 # TODO: folder based playlists
 # TODO: internet radio/playlist files
-# TODO: "disabled" playlist
-# TODO: disable/enable startup
 # TODO: make "playlist" option specify folder
-# TODO: new "playback" option for random/loop/disabled etc.
+# TODO: disable control script creation config
+# TODO: change playback and playist through socket
 
 # read ini file
 ini_file = os.path.join(MUSIC_FOLDER, INI_FILENAME)
 if os.path.exists(ini_file):
     ini = configparser.ConfigParser()
     ini.read(ini_file)
-    DEFAULT_PLAYLIST = ini.get("bgm", "playlist", fallback=DEFAULT_PLAYLIST)
+    DEFAULT_PLAYBACK = ini.get("bgm", "playback", fallback=DEFAULT_PLAYBACK)
     DEBUG = ini.getboolean("bgm", "debug", fallback=DEBUG)
     ENABLE_STARTUP = ini.getboolean("bgm", "startup", fallback=ENABLE_STARTUP)
 else:
     # create a default ini
     if os.path.exists(MUSIC_FOLDER):
         with open(ini_file, "w") as f:
-            f.write("[bgm]\nplaylist = random\nstartup = yes\ndebug = no\n")
+            f.write("[bgm]\nplayback = random\nplaylist = none\nstartup = yes\ndebug = no\n")
 
 
 def log(msg: str, always_print=False):
@@ -110,7 +109,7 @@ def wait_core_change():
 # TODO: per track loop options (filename?)
 class Player:
     player = None
-    # TODO: current playlist, and ability to change it
+    # TODO: current playlist/folder
     end_playlist = threading.Event()
     history = []
 
@@ -267,6 +266,8 @@ class Player:
             self.start_random_playlist()
         elif name == "loop":
             self.start_loop_playlist()
+        elif name == "disabled":
+            return
         else:
             # random playlist is fallback
             self.start_random_playlist()
@@ -285,7 +286,7 @@ class Player:
                 self.stop_playlist()
             elif cmd == "play":
                 self.stop_playlist()
-                self.start_playlist(DEFAULT_PLAYLIST)
+                self.start_playlist(DEFAULT_PLAYBACK)
             elif cmd == "skip":
                 self.stop()
             elif cmd == "pid":
@@ -364,7 +365,7 @@ def start_service(player: Player):
     # don't start playing if the boot track ran into a core launch
     # do start playing for a bit if the CORENAME file is still being created
     if core == MENU_CORE or core is None:
-        player.start_playlist(DEFAULT_PLAYLIST)
+        player.start_playlist(DEFAULT_PLAYBACK)
 
     while True:
         new_core = wait_core_change()
@@ -377,7 +378,7 @@ def start_service(player: Player):
             pass
         elif new_core == MENU_CORE:
             log("Switched to menu core, starting playlist...")
-            player.start_playlist(DEFAULT_PLAYLIST)
+            player.start_playlist(DEFAULT_PLAYBACK)
         elif new_core != MENU_CORE:
             log("Exited menu core, stopping playlist...")
             player.stop_playlist()
