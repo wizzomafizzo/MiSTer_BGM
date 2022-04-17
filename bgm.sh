@@ -11,6 +11,7 @@ import configparser
 import datetime
 import time
 import signal
+import re
 
 DEFAULT_PLAYLIST = "random"
 MUSIC_FOLDER = "/media/fat/music"
@@ -32,6 +33,8 @@ DEBUG = False
 # TODO: internet radio/playlist files
 # TODO: "disabled" playlist
 # TODO: disable/enable startup
+# TODO: make "playlist" option specify folder
+# TODO: new "playback" option for random/loop/disabled etc.
 
 # read ini file
 ini_file = os.path.join(MUSIC_FOLDER, INI_FILENAME)
@@ -88,8 +91,8 @@ def wait_core_change():
     args = ("inotifywait", "-e", "modify", CORENAME_FILE)
     monitor = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     while monitor is not None and monitor.poll() is None:
-            line = monitor.stdout.readline()
-            log(line.decode().rstrip())
+        line = monitor.stdout.readline()
+        log(line.decode().rstrip())
 
     if monitor.returncode != 0:
         log("Error when running inotify watch")
@@ -100,7 +103,6 @@ def wait_core_change():
     return core
 
 
-# TODO: vgmplay support
 # TODO: disable playlist (boot sound only)
 # TODO: per track loop options (filename?)
 class Player:
@@ -118,9 +120,17 @@ class Player:
     def is_wav(self, filename: str):
         return filename.lower().endswith(".wav")
 
-    # TODO: this might get crazy if vgmplay is added. use a regex?
+    def is_vgm(self, filename: str):
+        match = re.search(".*\.(vgm|vgz|vgm\.gz)$", filename.lower())
+        return match is not None
+
     def is_valid_file(self, filename: str):
-        return self.is_mp3(filename) or self.is_ogg(filename) or self.is_wav(filename)
+        return (
+            self.is_mp3(filename)
+            or self.is_ogg(filename)
+            or self.is_wav(filename)
+            or self.is_vgm(filename)
+        )
 
     def play_mp3(self, filename: str):
         args = ("mpg123", "--no-control", filename)
@@ -134,12 +144,15 @@ class Player:
             line = self.player.stdout.readline()
             output = line.decode().rstrip()
             log(output)
-            if "finished." in output or self.player is None or self.player.poll() is not None:
+            if (
+                "finished." in output
+                or self.player is None
+                or self.player.poll() is not None
+            ):
                 self.stop()
                 break
 
-    def play_ogg(self, filename: str):
-        args = ("ogg123", filename)
+    def play_file(self, args):
         self.player = subprocess.Popen(
             args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT
         )
@@ -148,15 +161,17 @@ class Player:
             log(line.decode().rstrip())
         self.stop()
 
+    def play_ogg(self, filename: str):
+        args = ("ogg123", filename)
+        self.play_file(args)
+
     def play_wav(self, filename: str):
         args = ("aplay", filename)
-        self.player = subprocess.Popen(
-            args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT
-        )
-        while self.player is not None and self.player.poll() is None:
-            line = self.player.stdout.readline()
-            log(line.decode().rstrip())
-        self.stop()
+        self.play_file(args)
+
+    def play_vgm(self, filename: str):
+        args = ("vgmplay", filename)
+        self.play_file(args)
 
     def all_tracks(self):
         tracks = []
@@ -198,6 +213,8 @@ class Player:
             self.play_ogg(filename)
         elif self.is_wav(filename):
             self.play_wav(filename)
+        elif self.is_vgm(filename):
+            self.play_vgm(filename)
 
     def get_random_track(self):
         tracks = self.all_tracks()
@@ -318,7 +335,7 @@ def send_socket(msg: str):
     s.close()
     if len(response) > 0:
         return response.decode()
-    
+
 
 def cleanup(player: Player):
     if player is not None:
@@ -351,7 +368,7 @@ def start_service(player: Player):
         if new_core is None:
             log("CORENAME file is missing, exiting...")
             break
-        
+
         if core == new_core:
             pass
         elif new_core == MENU_CORE:
@@ -382,9 +399,7 @@ def try_add_to_startup():
 
 # TODO: these scripts should say if socket doesn't exist
 def try_create_control_scripts():
-    template = (
-        '#!/usr/bin/env bash\n\necho -n "{}" | socat - UNIX-CONNECT:{}\n'
-    )
+    template = '#!/usr/bin/env bash\n\necho -n "{}" | socat - UNIX-CONNECT:{}\n'
     for cmd in ("play", "stop", "skip"):
         script = os.path.join(SCRIPTS_FOLDER, "bgm_{}.sh".format(cmd, SOCKET_FILE))
         if not os.path.exists(script):
@@ -399,10 +414,12 @@ if __name__ == "__main__":
             if os.path.exists(SOCKET_FILE):
                 log("BGM service is already running, exiting...", True)
                 sys.exit()
+
             def stop(sn=0, f=0):
                 log("Stopping service ({})".format(sn))
                 cleanup(player)
                 sys.exit()
+
             signal.signal(signal.SIGINT, stop)
             signal.signal(signal.SIGTERM, stop)
             player = Player()
