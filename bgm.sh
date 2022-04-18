@@ -29,14 +29,13 @@ MENU_CORE = "MENU"
 DEBUG = False
 
 
-# TODO: way to make it run sooner? put in docs how to add service file
-# TODO: remote control http server, separate file
-# TODO: internet radio/playlist files
 # TODO: change playback and playlist through socket
 # TODO: get status through socket
-# TODO: per track loop options (filename?)
 # TODO: remove control scripts and make dialog gui
-# TODO: track last/current playback type
+# TODO: internet radio/playlist files
+# TODO: per track loop options (filename?)
+# TODO: remote control http server, separate file
+# TODO: way to make it run sooner? put in docs how to add service file
 
 
 # read ini file
@@ -115,6 +114,7 @@ def wait_core_change():
 
 class Player:
     player = None
+    playback = DEFAULT_PLAYBACK
     playlist = DEFAULT_PLAYLIST
     end_playlist = threading.Event()
     history = []
@@ -281,7 +281,10 @@ class Player:
         playlist = threading.Thread(target=playlist_loop)
         playlist.start()
 
-    def start_playlist(self, playback):
+    def start_playlist(self, playback=None):
+        if playback is None:
+            playback = self.playback
+        
         if playback == "random":
             self.start_random_playlist()
         elif playback == "loop":
@@ -300,6 +303,7 @@ class Player:
         folder = self.get_playlist_path(name)
         if folder is not None and self.total_tracks(name) == 0:
             self.playlist = name
+            self.start_playlist()
 
     def start_remote(self):
         s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
@@ -311,11 +315,13 @@ class Player:
                 self.stop_playlist()
             elif cmd == "play":
                 self.stop_playlist()
-                self.start_playlist(DEFAULT_PLAYBACK)
+                self.start_playlist()
             elif cmd == "skip":
                 self.stop()
             elif cmd == "pid":
                 return os.getpid()
+            else:
+                log("Unknown command")
 
         def listener():
             while True:
