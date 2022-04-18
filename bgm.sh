@@ -19,7 +19,7 @@ MUSIC_FOLDER = "/media/fat/music"
 ENABLE_STARTUP = True
 HISTORY_SIZE = 0.2  # ratio of total tracks to keep in play history
 SOCKET_FILE = "/tmp/bgm.sock"
-MESSAGE_SIZE = 32
+MESSAGE_SIZE = 4096 # max size of socket payloads
 SCRIPTS_FOLDER = "/media/fat/Scripts"
 STARTUP_SCRIPT = "/media/fat/linux/user-startup.sh"
 CORENAME_FILE = "/tmp/CORENAME"
@@ -29,7 +29,6 @@ MENU_CORE = "MENU"
 DEBUG = False
 
 
-# TODO: change playback and playlist through socket
 # TODO: get status through socket
 # TODO: remove control scripts and make dialog gui
 # TODO: internet radio/playlist files
@@ -190,7 +189,7 @@ class Player:
         else:
             folder = os.path.join(MUSIC_FOLDER, name)
             if not os.path.exists(folder):
-                return MUSIC_FOLDER
+                return None
             else:
                 return folder
 
@@ -303,11 +302,18 @@ class Player:
         self.end_playlist.set()
         self.stop()
 
+    def in_playlist(self):
+        return not self.end_playlist.is_set()
+
     def change_playlist(self, name: str):
+        if name == "none":
+            name = None
         folder = self.get_playlist_path(name)
-        if folder is not None and self.total_tracks(name) == 0:
+        if folder is not None and self.total_tracks(name) > 0:
+            log("Changed playist: {}".format(name))
             self.playlist = name
-            self.start_playlist()
+            if self.in_playlist():
+                self.start_playlist()
 
     def start_remote(self):
         s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
@@ -318,7 +324,7 @@ class Player:
             if cmd == "stop":
                 self.stop_playlist()
             elif cmd.startswith("play"):
-                args = cmd.split(" ")
+                args = cmd.split(" ", 1)
                 if len(args) > 1:
                     playback = args[1]
                 else:
@@ -327,6 +333,11 @@ class Player:
                 self.start_playlist(playback)
             elif cmd == "skip":
                 self.stop()
+            elif cmd.startswith("chpl"):
+                args = cmd.split(" ", 1)
+                if len(args) > 1:
+                    name = args[1]
+                    self.change_playlist(name)
             elif cmd == "pid":
                 return os.getpid()
             else:
