@@ -19,7 +19,7 @@ MUSIC_FOLDER = "/media/fat/music"
 ENABLE_STARTUP = True
 HISTORY_SIZE = 0.2  # ratio of total tracks to keep in play history
 SOCKET_FILE = "/tmp/bgm.sock"
-MESSAGE_SIZE = 4096 # max size of socket payloads
+MESSAGE_SIZE = 4096  # max size of socket payloads
 SCRIPTS_FOLDER = "/media/fat/Scripts"
 STARTUP_SCRIPT = "/media/fat/linux/user-startup.sh"
 CORENAME_FILE = "/tmp/CORENAME"
@@ -29,7 +29,6 @@ MENU_CORE = "MENU"
 DEBUG = False
 
 
-# TODO: get status through socket
 # TODO: remove control scripts and make dialog gui
 # TODO: internet radio/playlist files
 # TODO: per track loop options (filename?)
@@ -113,6 +112,7 @@ def wait_core_change():
 
 class Player:
     player = None
+    playing = None
     playback = DEFAULT_PLAYBACK
     playlist = DEFAULT_PLAYLIST
     playlist_thread = None
@@ -219,11 +219,13 @@ class Player:
         if self.player is not None:
             self.player.kill()
             self.player = None
+            self.playing = None
 
     def play(self, filename: str):
         self.stop()
 
         if self.is_valid_file(filename):
+            self.playing = filename
             self.add_history(filename)
             log("Now playing: {}".format(filename))
         else:
@@ -340,6 +342,22 @@ class Player:
                     self.change_playlist(name)
             elif cmd == "pid":
                 return os.getpid()
+            elif cmd == "status":
+                if self.playing is not None:
+                    is_playing = "yes"
+                else:
+                    is_playing = "no"
+                if self.playlist is None:
+                    playlist = "none"
+                else:
+                    playlist = self.playlist
+                if self.playing is not None:
+                    filename = os.path.basename(self.playing)
+                else:
+                    filename = ""
+                return "{}\t{}\t{}\t{}".format(
+                    is_playing, self.playback, playlist, filename
+                )
             else:
                 log("Unknown command")
 
