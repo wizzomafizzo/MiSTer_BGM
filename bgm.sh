@@ -31,12 +31,12 @@ DEBUG = False
 
 # TODO: way to make it run sooner? put in docs how to add service file
 # TODO: remote control http server, separate file
-# TODO: folder based playlists
 # TODO: internet radio/playlist files
-# TODO: make "playlist" option specify folder
-# TODO: disable control script creation config
-# TODO: change playback and playist through socket
+# TODO: change playback and playlist through socket
+# TODO: get status through socket
 # TODO: per track loop options (filename?)
+# TODO: remove control scripts and make dialog gui
+# TODO: track last/current playback type
 
 
 # read ini file
@@ -45,9 +45,11 @@ if os.path.exists(ini_file):
     ini = configparser.ConfigParser()
     ini.read(ini_file)
     DEFAULT_PLAYBACK = ini.get("bgm", "playback", fallback=DEFAULT_PLAYBACK)
-    DEFAULT_PLAYLIST = ini.get("bgm", "playlist", fallback=DEFAULT_PLAYLIST)
     DEBUG = ini.getboolean("bgm", "debug", fallback=DEBUG)
     ENABLE_STARTUP = ini.getboolean("bgm", "startup", fallback=ENABLE_STARTUP)
+    DEFAULT_PLAYLIST = ini.get("bgm", "playlist", fallback=DEFAULT_PLAYLIST)
+    if DEFAULT_PLAYLIST == "none":
+        DEFAULT_PLAYLIST = None
 else:
     # create a default ini
     if os.path.exists(MUSIC_FOLDER):
@@ -179,17 +181,31 @@ class Player:
         args = ("vgmplay", filename)
         self.play_file(args)
 
-    def all_tracks(self):
-        tracks = []
+    def get_playlist_path(self, name=None):
+        if name is None:
+            name = self.playlist
+        if name is None:
+            return MUSIC_FOLDER
+        else:
+            folder = os.path.join(MUSIC_FOLDER, name)
+            if not os.path.exists(folder):
+                return MUSIC_FOLDER
+            else:
+                return folder
 
-        for track in os.listdir(MUSIC_FOLDER):
+    def all_tracks(self, playlist=None):
+        if playlist is None:
+            folder = self.get_playlist_path()
+        else:
+            folder = self.get_playlist_path(playlist)
+        tracks = []
+        for track in os.listdir(folder):
             if not track.startswith("_") and self.is_valid_file(track):
                 tracks.append(track)
-
         return tracks
 
-    def total_tracks(self):
-        return len(self.all_tracks())
+    def total_tracks(self, playlist=None):
+        return len(self.all_tracks(playlist))
 
     def add_history(self, filename: str):
         history_size = math.floor(self.total_tracks() * HISTORY_SIZE)
@@ -232,7 +248,7 @@ class Player:
         while tracks[index] in self.history:
             index = random_index()
 
-        return os.path.join(MUSIC_FOLDER, tracks[index])
+        return os.path.join(self.get_playlist_path(), tracks[index])
 
     def play_random(self):
         self.play(self.get_random_track())
@@ -265,12 +281,12 @@ class Player:
         playlist = threading.Thread(target=playlist_loop)
         playlist.start()
 
-    def start_playlist(self, name):
-        if name == "random":
+    def start_playlist(self, playback):
+        if playback == "random":
             self.start_random_playlist()
-        elif name == "loop":
+        elif playback == "loop":
             self.start_loop_playlist()
-        elif name == "disabled":
+        elif playback == "disabled":
             return
         else:
             # random playlist is fallback
@@ -279,6 +295,11 @@ class Player:
     def stop_playlist(self):
         self.end_playlist.set()
         self.stop()
+
+    def change_playlist(self, name: str):
+        folder = self.get_playlist_path(name)
+        if folder is not None and self.total_tracks(name) == 0:
+            self.playlist = name
 
     def start_remote(self):
         s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
@@ -317,9 +338,9 @@ class Player:
     def get_boot_track(self):
         boot_tracks = []
 
-        for name in os.listdir(MUSIC_FOLDER):
+        for name in os.listdir(self.get_playlist_path()):
             if name.startswith("_") and self.is_valid_file(name):
-                boot_tracks.append(os.path.join(MUSIC_FOLDER, name))
+                boot_tracks.append(os.path.join(self.get_playlist_path(), name))
 
         if len(boot_tracks) > 0:
             return boot_tracks[random_index(boot_tracks)]
@@ -355,6 +376,7 @@ def cleanup(player: Player):
 
 def start_service(player: Player):
     log("Starting service...")
+    log("Playlist folder: {}".format(player.get_playlist_path()))
 
     player.start_remote()
     # FIXME: make this non-blocking so it can be cut off during core launch
@@ -406,7 +428,6 @@ def try_add_to_startup():
         log("Added service to startup script.", True)
 
 
-# FIXME: these scripts should say if socket doesn't exist
 def try_create_control_scripts():
     template = '#!/usr/bin/env bash\n\necho -n "{}" | socat - UNIX-CONNECT:{}\n'
     for cmd in ("play", "stop", "skip"):
