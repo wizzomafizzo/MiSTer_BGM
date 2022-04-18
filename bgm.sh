@@ -116,6 +116,7 @@ class Player:
     player = None
     playback = DEFAULT_PLAYBACK
     playlist = DEFAULT_PLAYLIST
+    playlist_thread = None
     end_playlist = threading.Event()
     history = []
 
@@ -254,7 +255,6 @@ class Player:
         self.play(self.get_random_track())
 
     def start_random_playlist(self):
-        self.stop()
         log("Starting random playlist...")
         self.end_playlist.clear()
 
@@ -263,11 +263,10 @@ class Player:
                 self.play_random()
             log("Random playlist ended")
 
-        playlist = threading.Thread(target=playlist_loop)
-        playlist.start()
+        self.playlist_thread = threading.Thread(target=playlist_loop)
+        self.playlist_thread.start()
 
     def start_loop_playlist(self):
-        self.stop()
         log("Starting loop playlist...")
         self.end_playlist.clear()
 
@@ -278,13 +277,18 @@ class Player:
                 self.play(track)
             log("Loop playlist ended")
 
-        playlist = threading.Thread(target=playlist_loop)
-        playlist.start()
+        self.playlist_thread = threading.Thread(target=playlist_loop)
+        self.playlist_thread.start()
 
     def start_playlist(self, playback=None):
         if playback is None:
             playback = self.playback
-        
+
+        self.stop_playlist()
+        if self.playlist_thread is not None and self.playlist_thread.is_alive():
+            self.playlist_thread.join()
+            self.playlist_thread = None
+
         if playback == "random":
             self.start_random_playlist()
         elif playback == "loop":
@@ -309,13 +313,18 @@ class Player:
         s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         s.bind(SOCKET_FILE)
 
-        def handler(cmd):
+        def handler(cmd: str):
             log("Received command: {}".format(cmd))
             if cmd == "stop":
                 self.stop_playlist()
-            elif cmd == "play":
+            elif cmd.startswith("play"):
+                args = cmd.split(" ")
+                if len(args) > 1:
+                    playback = args[1]
+                else:
+                    playback = self.playback
                 self.stop_playlist()
-                self.start_playlist()
+                self.start_playlist(playback)
             elif cmd == "skip":
                 self.stop()
             elif cmd == "pid":
