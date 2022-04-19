@@ -236,14 +236,23 @@ class Player:
         else:
             return
 
-        if self.is_mp3(filename):
-            self.play_mp3(filename)
-        elif self.is_ogg(filename):
-            self.play_ogg(filename)
-        elif self.is_wav(filename):
-            self.play_wav(filename)
-        elif self.is_vgm(filename):
-            self.play_vgm(filename)
+        loop_match = re.search("^X(\d\d)\_", os.path.basename(filename))
+        if loop_match is not None:
+            loop = int(loop_match.group(1))
+        else:
+            loop = 1
+
+        while loop > 0:
+            log("Loop #{}".format(loop))
+            if self.is_mp3(filename):
+                self.play_mp3(filename)
+            elif self.is_ogg(filename):
+                self.play_ogg(filename)
+            elif self.is_wav(filename):
+                self.play_wav(filename)
+            elif self.is_vgm(filename):
+                self.play_vgm(filename)
+            loop -= 1
 
     def get_random_track(self):
         tracks = self.all_tracks()
