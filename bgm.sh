@@ -29,18 +29,18 @@ MENU_CORE = "MENU"
 DEBUG = False
 
 
-# TODO: remove control scripts and make dialog gui
 # TODO: internet radio/playlist files
 # TODO: per track loop options (filename?)
 # TODO: remote control http server, separate file
 # TODO: way to make it run sooner? put in docs how to add service file
+# TODO: config option to play during cores
 
 
 # read ini file
-ini_file = os.path.join(MUSIC_FOLDER, INI_FILENAME)
-if os.path.exists(ini_file):
+INI_FILE = os.path.join(MUSIC_FOLDER, INI_FILENAME)
+if os.path.exists(INI_FILE):
     ini = configparser.ConfigParser()
-    ini.read(ini_file)
+    ini.read(INI_FILE)
     DEFAULT_PLAYBACK = ini.get("bgm", "playback", fallback=DEFAULT_PLAYBACK)
     DEBUG = ini.getboolean("bgm", "debug", fallback=DEBUG)
     ENABLE_STARTUP = ini.getboolean("bgm", "startup", fallback=ENABLE_STARTUP)
@@ -50,7 +50,7 @@ if os.path.exists(ini_file):
 else:
     # create a default ini
     if os.path.exists(MUSIC_FOLDER):
-        with open(ini_file, "w") as f:
+        with open(INI_FILE, "w") as f:
             f.write(
                 "[bgm]\nplayback = random\nplaylist = none\nstartup = yes\ndebug = no\n"
             )
@@ -291,10 +291,13 @@ class Player:
             self.playlist_thread = None
 
         if playback == "random":
+            self.playback = "random"
             self.start_random_playlist()
         elif playback == "loop":
+            self.playback = "loop"
             self.start_loop_playlist()
         elif playback == "disabled":
+            self.playback = "disabled"
             return
         else:
             # random playlist is fallback
@@ -472,14 +475,142 @@ def try_add_to_startup():
         log("Added service to startup script.", True)
 
 
-def try_create_control_scripts():
-    template = '#!/usr/bin/env bash\n\necho -n "{}" | socat - UNIX-CONNECT:{}\n'
-    for cmd in ("play", "stop", "skip"):
-        script = os.path.join(SCRIPTS_FOLDER, "bgm_{}.sh".format(cmd, SOCKET_FILE))
-        if not os.path.exists(script):
-            with open(script, "w") as f:
-                f.write(template.format(cmd))
-                log("Created {} script.".format(cmd), True)
+def display_gui():
+    def get_menu_output(output):
+        try:
+            return int(output)
+        except ValueError:
+            return None
+
+    def get_status():
+        # FIXME: this is a hack to give service time to update itself, would be
+        #        better if it could check an update was successful before
+        #        getting the status
+        time.sleep(0.2)
+        return send_socket("status").split("\t")
+
+    def get_playlists():
+        playlists = []
+        for item in os.listdir(MUSIC_FOLDER):
+            if os.path.isdir(os.path.join(MUSIC_FOLDER, item)):
+                playlists.append(item)
+        return playlists
+
+    def get_config():
+        ini = configparser.ConfigParser()
+        ini.read(INI_FILE)
+        return ini
+
+    def write_config(config):
+        with open(INI_FILE, "w") as f:
+            config.write(f)
+
+    def menu(status, playlists, config):
+        if status[0] == "yes":
+            play_text = "Stop playing"
+        else:
+            play_text = "Start playing"
+
+        if status[3] == "":
+            now_playing = "---"
+        else:
+            now_playing = status[3]
+
+        if config.getboolean("bgm", "startup", fallback=ENABLE_STARTUP):
+            startup = "Disable startup on boot"
+        else:
+            startup = "Enable startup on boot"
+
+        args = [
+            "dialog",
+            "--title",
+            "Background Music",
+            "--ok-label",
+            "Select",
+            "--cancel-label",
+            "Exit",
+            "--menu",
+            "Now playing: {}\nPlayback: {}\nPlaylist: {}".format(
+                now_playing, status[1], status[2]
+            ),
+            "20",
+            "75",
+            "20",
+            "1",
+            "Skip current track",
+            "2",
+            play_text,
+            "3",
+            "PLAYBACK > Play random tracks (random)",
+            "4",
+            "PLAYBACK > Play a single random track on repeat (loop)",
+            "5",
+            "PLAYBACK > Disable all playback (disabled)",
+            "6",
+            "CONFIG   > {}".format(startup),
+            "7",
+            "PLAYLIST > No playlist",
+        ]
+
+        number = 8
+        for playlist in playlists:
+            args.append(str(number))
+            args.append("PLAYLIST > {}".format(playlist))
+            number += 1
+
+        result = subprocess.run(args, stderr=subprocess.PIPE)
+
+        selection = get_menu_output(result.stderr.decode())
+        button = get_menu_output(result.returncode)
+
+        return selection, button
+
+    button = 0
+    while button == 0:
+        status = get_status()
+        playlists = get_playlists()
+        config = get_config()
+
+        selection, button = menu(status, playlists, config)
+
+        if selection is None:
+            break
+
+        if selection == 1:
+            send_socket("skip")
+        elif selection == 2:
+            if status[0] == "yes":
+                send_socket("stop")
+            else:
+                send_socket("play")
+        elif selection == 3:
+            send_socket("play random")
+            config["bgm"]["playback"] = "random"
+            write_config(config)
+        elif selection == 4:
+            send_socket("play loop")
+            config["bgm"]["playback"] = "loop"
+            write_config(config)
+        elif selection == 5:
+            send_socket("play disabled")
+            config["bgm"]["playback"] = "disabled"
+            write_config(config)
+        elif selection == 6:
+            startup = config.getboolean("bgm", "startup", fallback=ENABLE_STARTUP)
+            if startup:
+                config["bgm"]["startup"] = "no"
+            else:
+                config["bgm"]["startup"] = "yes"
+            write_config(config)
+        elif selection == 7:
+            send_socket("chpl none")
+            config["bgm"]["playlist"] = "none"
+            write_config(config)
+        elif selection > 7:
+            name = playlists[selection - 8]
+            send_socket("chpl {}".format(name))
+            config["bgm"]["playlist"] = name
+            write_config(config)
 
 
 if __name__ == "__main__":
@@ -520,7 +651,6 @@ if __name__ == "__main__":
         os.mkdir(MUSIC_FOLDER)
         log("Created music folder.", True)
     try_add_to_startup()
-    try_create_control_scripts()
 
     player = Player()
     if player.total_tracks() == 0:
@@ -539,5 +669,5 @@ if __name__ == "__main__":
             )
             sys.exit()
         else:
-            log("BGM is already running.", True)
+            display_gui()
             sys.exit()
