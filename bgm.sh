@@ -17,6 +17,7 @@ DEFAULT_PLAYBACK = "random"
 DEFAULT_PLAYLIST = None
 MUSIC_FOLDER = "/media/fat/music"
 ENABLE_STARTUP = True
+PLAY_IN_CORE = False
 HISTORY_SIZE = 0.2  # ratio of total tracks to keep in play history
 SOCKET_FILE = "/tmp/bgm.sock"
 MESSAGE_SIZE = 4096  # max size of socket payloads
@@ -29,10 +30,8 @@ MENU_CORE = "MENU"
 DEBUG = False
 
 
-# TODO: per track loop options (filename?)
 # TODO: remote control http server, separate file
 # TODO: way to make it run sooner? put in docs how to add service file
-# TODO: config option to play during cores
 
 
 # read ini file
@@ -43,6 +42,7 @@ if os.path.exists(INI_FILE):
     DEFAULT_PLAYBACK = ini.get("bgm", "playback", fallback=DEFAULT_PLAYBACK)
     DEBUG = ini.getboolean("bgm", "debug", fallback=DEBUG)
     ENABLE_STARTUP = ini.getboolean("bgm", "startup", fallback=ENABLE_STARTUP)
+    PLAY_IN_CORE = ini.getboolean("bgm", "playincore", fallback=PLAY_IN_CORE)
     DEFAULT_PLAYLIST = ini.get("bgm", "playlist", fallback=DEFAULT_PLAYLIST)
     if DEFAULT_PLAYLIST == "none":
         DEFAULT_PLAYLIST = None
@@ -51,7 +51,7 @@ else:
     if os.path.exists(MUSIC_FOLDER):
         with open(INI_FILE, "w") as f:
             f.write(
-                "[bgm]\nplayback = random\nplaylist = none\nstartup = yes\ndebug = no\n"
+                "[bgm]\nplayback = random\nplaylist = none\nstartup = yes\nplayincore = no\ndebug = no\n"
             )
 
 
@@ -236,6 +236,7 @@ class Player:
         else:
             return
 
+        # per file looping
         loop_match = re.search("^X(\d\d)\_", os.path.basename(filename))
         if loop_match is not None:
             loop = int(loop_match.group(1))
@@ -451,7 +452,7 @@ def start_service(player: Player):
     core = get_core()
     # don't start playing if the boot track ran into a core launch
     # do start playing for a bit if the CORENAME file is still being created
-    if core == MENU_CORE or core is None:
+    if core == MENU_CORE or core is None or PLAY_IN_CORE:
         player.start_playlist(DEFAULT_PLAYBACK)
 
     while True:
@@ -461,11 +462,11 @@ def start_service(player: Player):
             log("CORENAME file is missing, exiting...")
             break
 
-        if core == new_core:
+        if core == new_core or PLAY_IN_CORE:
             pass
         elif new_core == MENU_CORE:
             log("Switched to menu core, starting playlist...")
-            player.start_playlist(DEFAULT_PLAYBACK)
+            player.start_playlist()
         elif new_core != MENU_CORE:
             log("Exited menu core, stopping playlist...")
             player.stop_playlist()
@@ -535,6 +536,11 @@ def display_gui():
         else:
             startup = "Enable startup on boot"
 
+        if config.getboolean("bgm", "playincore", fallback=PLAY_IN_CORE):
+            playincore = "Disable music in cores (requires cold reboot)"
+        else:
+            playincore = "Enable music in cores (requires cold reboot)"
+
         args = [
             "dialog",
             "--title",
@@ -563,10 +569,12 @@ def display_gui():
             "6",
             "CONFIG   > {}".format(startup),
             "7",
+            "CONFIG   > {}".format(playincore),
+            "8",
             "PLAYLIST > No playlist",
         ]
 
-        number = 8
+        number = 9
         for playlist in playlists:
             args.append(str(number))
             args.append("PLAYLIST > {}".format(playlist))
@@ -617,11 +625,18 @@ def display_gui():
                 config["bgm"]["startup"] = "yes"
             write_config(config)
         elif selection == 7:
+            playincore = config.getboolean("bgm", "playincore", fallback=PLAY_IN_CORE)
+            if playincore:
+                config["bgm"]["playincore"] = "no"
+            else:
+                config["bgm"]["playincore"] = "yes"
+            write_config(config)
+        elif selection == 8:
             send_socket("chpl none")
             config["bgm"]["playlist"] = "none"
             write_config(config)
-        elif selection > 7:
-            name = playlists[selection - 8]
+        elif selection > 8:
+            name = playlists[selection - 9]
             send_socket("chpl {}".format(name))
             config["bgm"]["playlist"] = name
             write_config(config)
