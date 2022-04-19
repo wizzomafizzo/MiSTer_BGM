@@ -139,6 +139,13 @@ class Player:
             or self.is_vgm(filename)
         )
 
+    def get_loop_amount(self, filename: str):
+        loop_match = re.search("^X(\d\d)\_", os.path.basename(filename))
+        if loop_match is not None:
+            return int(loop_match.group(1))
+        else:
+            return 1
+
     def play_mp3(self, filename: str):
         # get url from playlist files
         if filename.lower().endswith(".pls"):
@@ -162,7 +169,7 @@ class Player:
                 or self.player is None
                 or self.player.poll() is not None
             ):
-                self.stop()
+                self.kill_player()
                 break
 
     def play_file(self, args):
@@ -172,7 +179,7 @@ class Player:
         while self.player is not None and self.player.poll() is None:
             line = self.player.stdout.readline()
             log(line.decode().rstrip())
-        self.stop()
+        self.kill_player()
 
     def play_ogg(self, filename: str):
         args = ("ogg123", filename)
@@ -220,11 +227,16 @@ class Player:
             self.history.pop(0)
         self.history.append(filename)
 
-    def stop(self):
+    def kill_player(self):
         if self.player is not None:
             self.player.kill()
             self.player = None
+
+    def stop(self):
+        if self.player is not None:
             self.playing = None
+            self.player.kill()
+            self.player = None
 
     def play(self, filename: str):
         self.stop()
@@ -236,14 +248,9 @@ class Player:
         else:
             return
 
-        # per file looping
-        loop_match = re.search("^X(\d\d)\_", os.path.basename(filename))
-        if loop_match is not None:
-            loop = int(loop_match.group(1))
-        else:
-            loop = 1
+        loop = self.get_loop_amount(filename)
 
-        while loop > 0:
+        while loop > 0 and self.playing is not None:
             log("Loop #{}".format(loop))
             if self.is_mp3(filename):
                 self.play_mp3(filename)
@@ -254,6 +261,8 @@ class Player:
             elif self.is_vgm(filename):
                 self.play_vgm(filename)
             loop -= 1
+
+        self.playing = None
 
     def get_random_track(self):
         tracks = self.all_tracks()
