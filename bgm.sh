@@ -29,7 +29,6 @@ MENU_CORE = "MENU"
 DEBUG = False
 
 
-# TODO: internet radio/playlist files
 # TODO: per track loop options (filename?)
 # TODO: remote control http server, separate file
 # TODO: way to make it run sooner? put in docs how to add service file
@@ -120,7 +119,7 @@ class Player:
     history = []
 
     def is_mp3(self, filename: str):
-        return filename.lower().endswith(".mp3")
+        return filename.lower().endswith(".mp3") or filename.lower().endswith(".pls")
 
     def is_ogg(self, filename: str):
         return filename.lower().endswith(".ogg")
@@ -141,10 +140,16 @@ class Player:
         )
 
     def play_mp3(self, filename: str):
+        # get url from playlist files
+        if filename.lower().endswith(".pls"):
+            with open(filename, "r") as f:
+                filename = f.read()
+        
         args = ("mpg123", "--no-control", filename)
         self.player = subprocess.Popen(
             args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT
         )
+
         # workaround for a strange issue with mpg123 on MiSTer
         # some mp3 files will play but cause mpg123 to hang at the end
         # this may be fixed when MiSTer ships with a newer version
