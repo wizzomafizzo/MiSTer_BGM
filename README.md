@@ -16,19 +16,21 @@ Once installed, BGM will automatically start on MiSTer boot and randomly play an
 
 BGM will stop playing when a core is launched, and resume playing when you get back to the menu.
 
+Launch `bgm` from the scripts menu to show the control GUI.
+
 ### Supported files
 
 BGM supports playback of .mp3, .ogg, .wav and .vgm/.vgz files. These files can be used interchangeably in any playlist.
 
 #### Internet radio
 
-Internet radio stations can also be played using .pls files. The best way to manage these is by creating a new playlist folder, placing a single .pls file in that folder and playing it via the playlist.
+Internet radio stations can also be played using .pls files. The best way to manage these is by creating a new playlist folder, placing a single .pls file in that folder and playing it via the new playlist.
 
 Note that a .pls file must be a file containing a single URL to the radio stream. Most radio files come like this, but be sure to double check if it's not working.
 
 ### Controls
 
-When the BGM service is running, launch the `bgm` script from the MiSTer Scripts menu to launch a control GUI. This GUI will give you basic playback functions, configuration options and the current playback status.
+When the BGM service is running, launch the `bgm` script from the MiSTer Scripts menu to launch the control GUI. This GUI will give you basic playback functions, configuration options and the current playback status.
 
 Changes made in the control GUI will also be written to the `bgm.ini` file and remembered between MiSTer boots.
 
@@ -36,17 +38,17 @@ Changes made in the control GUI will also be written to the `bgm.ini` file and r
 
 Rename a music file with a `_` in front to make BGM play this file first on MiSTer startup (e.g. `_Mario 64 - Level Select.mp3`).
 
-This can be done with multiple files to have it pick a random one each time.
+This can be done with multiple files to have it pick a random one each time. Boot sounds are picked from the active playlist.
 
 ### Playback types
 
 Playback types can be configured in the control GUI or in the `bgm.ini` file.
 
-By default, BGM will play the `random` playback type, which just repeatedly picks a track at random to play.
+By default, BGM will play the `random` playback type, which repeatedly picks a track at random to play.
 
-An alternate playback type called `loop` can also be used, which picks a random track to start, and then plays that same track on repeat until a reboot or core change.
+An alternate playback type called `loop` can be used, which picks a random track to start, and then plays that same track on repeat until a reboot or core change.
 
-The `disabled` playback type will stop tracks from playing completely, except for any boot sounds set up.
+The `disabled` playback type will stop tracks from playing completely, except for boot sounds.
 
 ### Playlists
 
@@ -60,4 +62,4 @@ The `none` playlist can be used to continue using music files from the top level
 
 Individual music files can be configured to loop a certain number of times. If you have a short piece of background music from a game that you'd like to run longer, you can set it so that when that track starts playing it will loop a certain number of times before continuing to the next track.
 
-You can do this be renaming the music file so it has a `X##_` in front of the filename where `##` is the number of times it should loop with a leading zero. For example: `X05_My File.mp3` would loop it 5 times, while `X23_My File.mp3` would loop it 23 times.
+You can do this be renaming the music file so it has `X##_` in front of the filename where `##` is the number of times it should loop with a leading zero. For example: `X05_My File.mp3` would loop it 5 times, while `X23_My File.mp3` would loop it 23 times.
