@@ -1,0 +1,19 @@
+{
+    "base_files_url": "",
+    "db_files": [],
+    "db_id": "bgm",
+    "db_url": "https://github.com/wizzomafizzo/MiSTer_BGM/blob/main/bgm.json",
+    "default_options": {},
+    "files": {
+        "Scripts/bgm.sh": {
+            "hash": "9cbbd00a85c2870ce75b916f774200ef",
+            "size": 22279,
+            "url": "https://raw.githubusercontent.com/wizzomafizzo/MiSTer_BGM/main/bgm.sh"
+        }
+    },
+    "folders": {
+        "Scripts": {}
+    },
+    "timestamp": 1650546555,
+    "zips": {}
+}

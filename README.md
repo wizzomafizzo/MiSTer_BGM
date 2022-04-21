@@ -10,6 +10,15 @@ Copy your .mp3, .ogg, .wav or .vgm files to the newly created `music` folder on 
 
 Reboot your MiSTer or re-run `bgm`.
 
+### Updates
+
+BGM can be automatically updated with the MiSTer downloader script (and update_all). Add the following text to the `downloader.ini` file on your SD card:
+
+```
+[bgm]
+db_url = 'https://github.com/wizzomafizzo/MiSTer_BGM/blob/main/bgm.json'
+```
+
 ## Usage
 
 Once installed, BGM will automatically start on MiSTer boot and randomly play any tracks in the `music` folder.
