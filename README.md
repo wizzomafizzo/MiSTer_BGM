@@ -1,5 +1,5 @@
 # MiSTer_BGM
-Background music player for the MiSTer menu.
+Background music player for the [MiSTer](https://github.com/MiSTer-devel/Main_MiSTer/wiki) menu
 
 ## Installation
 Copy [bgm.sh](https://github.com/wizzomafizzo/MiSTer_BGM/raw/main/bgm.sh) to the `Scripts` folder on your SD card.
