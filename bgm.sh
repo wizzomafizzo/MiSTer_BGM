@@ -30,7 +30,6 @@ MENU_CORE = "MENU"
 DEBUG = False
 
 
-# TODO: split pls into separate category and ignore in all playlist
 # TODO: volume control
 # TODO: active indication on control entries
 # TODO: remote control http server, separate file
@@ -567,6 +566,12 @@ def display_gui():
         with open(INI_FILE, "w") as f:
             config.write(f)
 
+    def active(condition):
+        if condition:
+            return " [ACTIVE]"
+        else:
+            return ""
+
     def menu(status, playlists, config):
         if status[0] == "yes":
             play_text = "Stop playing"
@@ -608,25 +613,25 @@ def display_gui():
             "2",
             play_text,
             "3",
-            "PLAYBACK > Play random tracks (random)",
+            "PLAYBACK > Play random tracks (random)" + active(status[1] == "random"),
             "4",
-            "PLAYBACK > Play a single random track on repeat (loop)",
+            "PLAYBACK > Play a single random track on repeat (loop)" + active(status[1] == "loop"),
             "5",
-            "PLAYBACK > Disable all playback (disabled)",
+            "PLAYBACK > Disable all playback (disabled)" + active(status[1] == "disabled"),
             "6",
             "CONFIG   > {}".format(startup),
             "7",
             "CONFIG   > {}".format(playincore),
             "8",
-            "PLAYLIST > None (just top level files)",
+            "PLAYLIST > None (just top level files)" + active(status[2] == "none"),
             "9",
-            "PLAYLIST > All (all playlists combined)",
+            "PLAYLIST > All (all playlists combined)" + active(status[2] == "all"),
         ]
 
         number = 10
         for playlist in playlists:
             args.append(str(number))
-            args.append("PLAYLIST > {}".format(playlist))
+            args.append("PLAYLIST > {}".format(playlist) + active(status[2] == playlist))
             number += 1
 
         result = subprocess.run(args, stderr=subprocess.PIPE)
