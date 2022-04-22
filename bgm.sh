@@ -30,8 +30,6 @@ MENU_CORE = "MENU"
 DEBUG = False
 
 
-# TODO: volume control
-# TODO: active indication on control entries
 # TODO: remote control http server, separate file
 
 
