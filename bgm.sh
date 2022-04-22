@@ -30,10 +30,10 @@ MENU_CORE = "MENU"
 DEBUG = False
 
 
-# TODO: playlists are not working, some are not just url in file
-# TODO: handle things better when there's only boot sounds
 # TODO: restart service after playincore is changed
 # TODO: split pls into separate category and ignore in all playlist
+# TODO: volume control
+# TODO: active indication on control entries
 # TODO: remote control http server, separate file
 
 
@@ -220,14 +220,16 @@ class Player:
             else:
                 return folder
 
-    def filter_tracks(self, files):
+    def filter_tracks(self, files, include_boot=False):
         tracks = []
         for track in files:
-            if not track.startswith("_") and self.is_valid_file(track):
+            if (
+                True if include_boot else not track.startswith("_")
+            ) and self.is_valid_file(track):
                 tracks.append(track)
         return tracks
 
-    def all_tracks(self, playlist=None):
+    def get_tracks(self, playlist=None, include_boot=False):
         if playlist is None:
             playlist = self.playlist
         folder = self.get_playlist_path(playlist)
@@ -235,20 +237,20 @@ class Player:
 
         if playlist is None:
             # just the top level folder
-            filtered = self.filter_tracks(os.listdir(folder))
+            filtered = self.filter_tracks(os.listdir(folder), include_boot=include_boot)
             for track in filtered:
                 tracks.append(os.path.join(folder, track))
         else:
             # otherwise do recursively
             for root, dirs, files in os.walk(folder):
-                filtered = self.filter_tracks(files)
+                filtered = self.filter_tracks(files, include_boot)
                 for track in filtered:
                     tracks.append(os.path.join(root, track))
 
         return tracks
 
-    def total_tracks(self, playlist=None):
-        return len(self.all_tracks(playlist))
+    def total_tracks(self, playlist=None, include_boot=False):
+        return len(self.get_tracks(playlist, include_boot=include_boot))
 
     def add_history(self, filename: str):
         history_size = math.floor(self.total_tracks() * HISTORY_SIZE)
@@ -296,7 +298,7 @@ class Player:
         self.playing = None
 
     def get_random_track(self):
-        tracks = self.all_tracks()
+        tracks = self.get_tracks()
         if len(tracks) == 0:
             return
 
@@ -307,16 +309,16 @@ class Player:
 
         return tracks[index]
 
-    def play_random(self):
-        self.play(self.get_random_track())
-
     def start_random_playlist(self):
         log("Starting random playlist...")
         self.end_playlist.clear()
 
         def playlist_loop():
             while not self.end_playlist.is_set():
-                self.play_random()
+                track = self.get_random_track()
+                if track is None:
+                    break
+                self.play(track)
             log("Random playlist ended")
 
         self.playlist_thread = threading.Thread(target=playlist_loop)
@@ -329,7 +331,7 @@ class Player:
         track = self.get_random_track()
 
         def playlist_loop():
-            while not self.end_playlist.is_set():
+            while not self.end_playlist.is_set() and track is not None:
                 self.play(track)
             log("Loop playlist ended")
 
@@ -484,10 +486,6 @@ def start_service(player: Player):
     # FIXME: make this non-blocking so it can be cut off during core launch
     #        this only affects people with really long boot sounds
     player.play_boot()
-
-    if player.total_tracks() == 0:
-        log("No tracks available to play")
-        return
 
     core = get_core()
     # don't start playing if the boot track ran into a core launch
@@ -674,7 +672,6 @@ def display_gui():
                 config["bgm"]["playincore"] = "yes"
             write_config(config)
         elif selection == 8:
-            # FIXME: if you get to this menu and none has no playable files it crashes
             send_socket("chpl none")
             config["bgm"]["playlist"] = "none"
             write_config(config)
@@ -729,7 +726,7 @@ if __name__ == "__main__":
     try_add_to_startup()
 
     player = Player()
-    if player.total_tracks() == 0:
+    if player.total_tracks(include_boot=True) == 0:
         log(
             "Add music files to {} and re-run this script to start.".format(
                 MUSIC_FOLDER
