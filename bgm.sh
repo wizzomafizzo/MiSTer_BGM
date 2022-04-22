@@ -31,14 +31,13 @@ DEBUG = False
 
 
 # TODO: remote control http server, separate file
-# TODO: way to make it run sooner? put in docs how to add service file
-# TODO: recursive search subfolders in playlist except none
-# TODO: "all" playlist to search every folder
 # TODO: update documentation to clarify boot sound usage
 # TODO: playlists are not working, some are not just url in file
 # TODO: handle things better when there's only boot sounds
 # TODO: clarify what boot sounds are for
 # TODO: restart service after playincore is changed
+# TODO: can we detect inactivity somehow?
+# TODO: split pls into separate category and ignore in all playlist
 
 
 # read ini file
@@ -158,7 +157,7 @@ class Player:
         if filename.lower().endswith(".pls"):
             with open(filename, "r") as f:
                 filename = f.read()
-        
+
         args = ("mpg123", "--no-control", filename)
         self.player = subprocess.Popen(
             args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT
@@ -206,21 +205,40 @@ class Player:
         if name is None:
             return MUSIC_FOLDER
         else:
-            folder = os.path.join(MUSIC_FOLDER, name)
+            if name == "all":
+                folder = MUSIC_FOLDER
+            else:
+                folder = os.path.join(MUSIC_FOLDER, name)
             if not os.path.exists(folder):
                 return None
             else:
                 return folder
 
-    def all_tracks(self, playlist=None):
-        if playlist is None:
-            folder = self.get_playlist_path()
-        else:
-            folder = self.get_playlist_path(playlist)
+    def filter_tracks(self, files):
         tracks = []
-        for track in os.listdir(folder):
+        for track in files:
             if not track.startswith("_") and self.is_valid_file(track):
                 tracks.append(track)
+        return tracks
+
+    def all_tracks(self, playlist=None):
+        if playlist is None:
+            playlist = self.playlist
+        folder = self.get_playlist_path(playlist)
+        tracks = []
+
+        if playlist is None:
+            # just the top level folder
+            filtered = self.filter_tracks(os.listdir(folder))
+            for track in filtered:
+                tracks.append(os.path.join(folder, track))
+        else:
+            # otherwise do recursively
+            for root, dirs, files in os.walk(folder):
+                filtered = self.filter_tracks(files)
+                for track in filtered:
+                    tracks.append(os.path.join(root, track))
+
         return tracks
 
     def total_tracks(self, playlist=None):
@@ -279,9 +297,9 @@ class Player:
         index = random_index(tracks)
         # avoid replaying recent tracks
         while tracks[index] in self.history:
-            index = random_index()
+            index = random_index(tracks)
 
-        return os.path.join(self.get_playlist_path(), tracks[index])
+        return tracks[index]
 
     def play_random(self):
         self.play(self.get_random_track())
@@ -587,10 +605,12 @@ def display_gui():
             "7",
             "CONFIG   > {}".format(playincore),
             "8",
-            "PLAYLIST > No playlist",
+            "PLAYLIST > None (just top level files)",
+            "9",
+            "PLAYLIST > All (all playlists combined)",
         ]
 
-        number = 9
+        number = 10
         for playlist in playlists:
             args.append(str(number))
             args.append("PLAYLIST > {}".format(playlist))
@@ -648,11 +668,16 @@ def display_gui():
                 config["bgm"]["playincore"] = "yes"
             write_config(config)
         elif selection == 8:
+            # FIXME: if you get to this menu and none has no playable files it crashes
             send_socket("chpl none")
             config["bgm"]["playlist"] = "none"
             write_config(config)
-        elif selection > 8:
-            name = playlists[selection - 9]
+        elif selection == 9:
+            send_socket("chpl all")
+            config["bgm"]["playlist"] = "all"
+            write_config(config)
+        elif selection > 9:
+            name = playlists[selection - 10]
             send_socket("chpl {}".format(name))
             config["bgm"]["playlist"] = name
             write_config(config)

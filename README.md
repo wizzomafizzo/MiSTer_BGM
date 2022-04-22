@@ -61,11 +61,13 @@ The `disabled` playback type will stop tracks from playing completely, except fo
 
 ### Playlists
 
-Music files can be separated into playlists. Create a subfolder in the `music` directory and fill it with music files, it will now show up in the control GUI as a playlist.
+Music files can be separated into playlists. Create a subfolder in the `music` directory and fill it with music files, it will now show up in the control GUI as a playlist. Playlists can contain any number and depth of subfolders if you want to organise tracks.
 
-You can switch between playlists in the control GUI. As you switch, the current playlist will also be written to `bgm.ini` so it will be started automatically next boot. Boot sounds are also taken from the current playlist.
+You can switch between playlists in the control GUI. As you switch, the current playlist will also be written to `bgm.ini`, so it will be started automatically next boot. Boot sounds are also taken from the current playlist.
 
-The `none` playlist can be used to continue using music files from the top level of the `music` folder. Music files in the top level of the `music` folder and playlist subfolders will not conflict with each other.
+The `none` playlist (the default) can be used to only use files from the top level of the `music` folder. Music files in the top level of the `music` folder and playlist subfolders will not conflict with each other.
+
+The `all` playlist will play all files from every folder in the `music` folder.
 
 ### Per track looping
 
