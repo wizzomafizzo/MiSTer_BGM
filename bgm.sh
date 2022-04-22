@@ -149,11 +149,20 @@ class Player:
         else:
             return 1
 
+    def get_pls_url(self, filename: str):
+        with open(filename, "r") as f:
+            contents = f.read()
+            match = re.search("https?:.+", contents, re.MULTILINE)
+            if match is not None:
+                return match[0]
+            else:
+                log("Playlist URL not found")
+                return ""
+
     def play_mp3(self, filename: str):
         # get url from playlist files
         if filename.lower().endswith(".pls"):
-            with open(filename, "r") as f:
-                filename = f.read()
+            filename = self.get_pls_url(filename)
 
         args = ("mpg123", "--no-control", filename)
         self.player = subprocess.Popen(

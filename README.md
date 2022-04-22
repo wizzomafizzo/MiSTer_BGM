@@ -33,9 +33,7 @@ BGM supports playback of .mp3, .ogg, .wav and .vgm/.vgz files. These files can b
 
 #### Internet radio
 
-Internet radio stations can also be played using .pls files. The best way to manage these is by creating a new playlist folder, placing a single .pls file in that folder and playing it via the new playlist.
-
-Note that a .pls file must be a file containing a single URL to the radio stream. Most radio files come like this, but be sure to double check if it's not working.
+Internet radio stations can be played using .pls files. The best way to manage these is by creating a new playlist folder, placing a single .pls file in that folder and playing it via the new playlist. Multiple .pls files can be placed in a playlist (along with any other file), but they'll need to be manually skipped to move onto the next one.
 
 ### Controls
 
