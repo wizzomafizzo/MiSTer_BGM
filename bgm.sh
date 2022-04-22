@@ -121,7 +121,10 @@ class Player:
     history = []
 
     def is_mp3(self, filename: str):
-        return filename.lower().endswith(".mp3") or filename.lower().endswith(".pls")
+        return filename.lower().endswith(".mp3")
+
+    def is_pls(self, filename: str):
+        return filename.lower().endswith(".pls")
 
     def is_ogg(self, filename: str):
         return filename.lower().endswith(".ogg")
@@ -139,6 +142,7 @@ class Player:
             or self.is_ogg(filename)
             or self.is_wav(filename)
             or self.is_vgm(filename)
+            or self.is_pls(filename)
         )
 
     def get_loop_amount(self, filename: str):
@@ -160,7 +164,7 @@ class Player:
 
     def play_mp3(self, filename: str):
         # get url from playlist files
-        if filename.lower().endswith(".pls"):
+        if self.is_pls(filename):
             filename = self.get_pls_url(filename)
 
         args = ("mpg123", "--no-control", filename)
@@ -222,10 +226,14 @@ class Player:
     def filter_tracks(self, files, include_boot=False):
         tracks = []
         for track in files:
-            if (
-                True if include_boot else not track.startswith("_")
-            ) and self.is_valid_file(track):
+            if include_boot and self.is_valid_file(track):
                 tracks.append(track)
+            else:
+                if self.is_valid_file(track) and not track.startswith("_"):
+                    if self.playlist == "all" and not self.is_pls(track):
+                        tracks.append(track)
+                    elif self.playlist != "all":
+                        tracks.append(track)
         return tracks
 
     def get_tracks(self, playlist=None, include_boot=False):
@@ -285,6 +293,8 @@ class Player:
         while loop > 0 and self.playing is not None:
             log("Loop #{}".format(loop))
             if self.is_mp3(filename):
+                self.play_mp3(filename)
+            elif self.is_pls(filename):
                 self.play_mp3(filename)
             elif self.is_ogg(filename):
                 self.play_ogg(filename)
@@ -370,7 +380,7 @@ class Player:
         if name == "none":
             name = None
         folder = self.get_playlist_path(name)
-        if folder is not None and self.total_tracks(name) > 0:
+        if folder is not None and self.total_tracks(name, include_boot=True) > 0:
             log("Changed playist: {}".format(name))
             self.playlist = name
             if self.in_playlist():
