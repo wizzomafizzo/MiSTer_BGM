@@ -30,14 +30,11 @@ MENU_CORE = "MENU"
 DEBUG = False
 
 
-# TODO: remote control http server, separate file
-# TODO: update documentation to clarify boot sound usage
 # TODO: playlists are not working, some are not just url in file
 # TODO: handle things better when there's only boot sounds
-# TODO: clarify what boot sounds are for
 # TODO: restart service after playincore is changed
-# TODO: can we detect inactivity somehow?
 # TODO: split pls into separate category and ignore in all playlist
+# TODO: remote control http server, separate file
 
 
 # read ini file

@@ -43,12 +43,6 @@ When the BGM service is running, launch the `bgm` script from the MiSTer Scripts
 
 Changes made in the control GUI will also be written to the `bgm.ini` file and remembered between MiSTer boots.
 
-### Boot sounds
-
-Rename a music file with a `_` in front to make BGM play this file first on MiSTer startup (e.g. `_Mario 64 - Level Select.mp3`).
-
-This can be done with multiple files to have it pick a random one each time. Boot sounds are picked from the active playlist.
-
 ### Playback types
 
 Playback types can be configured in the control GUI or in the `bgm.ini` file.
@@ -74,3 +68,9 @@ The `all` playlist will play all files from every folder in the `music` folder.
 Individual music files can be configured to loop a certain number of times. If you have a short piece of background music from a game that you'd like to run longer, you can set it so that when that track starts playing it will loop a certain number of times before continuing to the next track.
 
 You can do this be renaming the music file so it has `X##_` in front of the filename where `##` is the number of times it should loop with a leading zero. For example: `X05_My File.mp3` would loop it 5 times, while `X23_My File.mp3` would loop it 23 times.
+
+### Boot sounds
+
+Marking a music file as a boot sound will make BGM play it once when MiSTer starts up. This is intended for very short sound clips, like what you'd hear when booting up *\<your favourite console\>*.
+
+Rename a music file with a `_` in front to make BGM play this file first on MiSTer startup (e.g. `_My File.mp3`). This can be done with multiple files to have it pick a random one each time. Boot sounds are picked from the active playlist and will be excluded from normal play.
