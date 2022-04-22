@@ -30,7 +30,6 @@ MENU_CORE = "MENU"
 DEBUG = False
 
 
-# TODO: restart service after playincore is changed
 # TODO: split pls into separate category and ignore in all playlist
 # TODO: volume control
 # TODO: active indication on control entries
@@ -575,9 +574,9 @@ def display_gui():
             startup = "Enable startup on boot"
 
         if config.getboolean("bgm", "playincore", fallback=PLAY_IN_CORE):
-            playincore = "Disable music in cores (requires cold reboot)"
+            playincore = "Disable music in cores"
         else:
-            playincore = "Enable music in cores (requires cold reboot)"
+            playincore = "Enable music in cores"
 
         args = [
             "dialog",
@@ -671,6 +670,11 @@ def display_gui():
             else:
                 config["bgm"]["playincore"] = "yes"
             write_config(config)
+            script = os.path.join(SCRIPTS_FOLDER, "bgm.sh")
+            os.system("{} restart > /dev/null".format(script))
+            log("Waiting for service restart...", True)
+            # FIXME: any better way to wait for service?
+            time.sleep(2)
         elif selection == 8:
             send_socket("chpl none")
             config["bgm"]["playlist"] = "none"
@@ -719,6 +723,10 @@ if __name__ == "__main__":
             if pid is not None:
                 os.system("kill {}".format(pid))
             sys.exit()
+        elif sys.argv[1] == "restart":
+            script = os.path.join(SCRIPTS_FOLDER, "bgm.sh")
+            os.system("{} stop".format(script))
+            os.system("{} start".format(script))
 
     if not os.path.exists(MUSIC_FOLDER):
         os.mkdir(MUSIC_FOLDER)
