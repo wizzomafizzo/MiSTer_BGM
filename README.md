@@ -16,7 +16,7 @@ BGM can be automatically updated with the MiSTer downloader script (and update_a
 
 ```
 [bgm]
-db_url = 'https://github.com/wizzomafizzo/MiSTer_BGM/blob/main/bgm.json'
+db_url = 'https://raw.githubusercontent.com/wizzomafizzo/MiSTer_BGM/main/bgm.json'
 ```
 
 ## Usage
