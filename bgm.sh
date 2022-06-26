@@ -36,6 +36,7 @@ DEBUG = False
 # TODO: option to adjust adjust volume on menu launch
 # TODO: add support to play specific track per core on core startup
 # TODO: wait until gui exit to save ini file
+# TODO: update docs, updater file
 
 
 # read ini file
@@ -667,15 +668,16 @@ def display_gui():
         return selection, button
 
     last_item = ""
+    config = get_config()
     button = 0
     while button == 0:
         status = get_status()
         playlists = get_playlists()
-        config = get_config()
-
+        
         selection, button = menu(status, playlists, config, last_item)
 
         if selection is None:
+            write_config(config)
             break
 
         last_item = str(selection)
@@ -690,22 +692,18 @@ def display_gui():
         elif selection == 3:
             send_socket("play random")
             config["bgm"]["playback"] = "random"
-            write_config(config)
         elif selection == 4:
             send_socket("play loop")
             config["bgm"]["playback"] = "loop"
-            write_config(config)
         elif selection == 5:
             send_socket("play disabled")
             config["bgm"]["playback"] = "disabled"
-            write_config(config)
         elif selection == 6:
             startup = config.getboolean("bgm", "startup", fallback=ENABLE_STARTUP)
             if startup:
                 config["bgm"]["startup"] = "no"
             else:
                 config["bgm"]["startup"] = "yes"
-            write_config(config)
         elif selection == 7:
             playincore = config.getboolean("bgm", "playincore", fallback=PLAY_IN_CORE)
             if playincore:
@@ -714,20 +712,16 @@ def display_gui():
             else:
                 config["bgm"]["playincore"] = "yes"
                 send_socket("set playincore yes")
-            write_config(config)
         elif selection == 8:
             send_socket("set playlist none")
             config["bgm"]["playlist"] = "none"
-            write_config(config)
         elif selection == 9:
             send_socket("set playlist all")
             config["bgm"]["playlist"] = "all"
-            write_config(config)
         elif selection > 9:
             name = playlists[selection - 10]
             send_socket("set playlist {}".format(name))
             config["bgm"]["playlist"] = name
-            write_config(config)
 
 
 if __name__ == "__main__":
