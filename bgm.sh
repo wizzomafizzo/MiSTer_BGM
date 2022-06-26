@@ -34,7 +34,6 @@ DEBUG = False
 # TODO: separate remote control http server
 # TODO: option to play music after inactivity period
 # TODO: option to adjust adjust volume on menu launch
-# TODO: add support to play specific track per core on core startup
 # TODO: update docs, updater file
 
 
@@ -495,6 +494,26 @@ class Player:
             log("Selected boot track: {}".format(track))
             self.play(track)
 
+    def play_core_boot(self, core):
+        if not os.path.exists(BOOT_FOLDER):
+            return
+
+        for core_folder in os.listdir(BOOT_FOLDER):
+            if core_folder.lower() == core.lower():
+                if os.path.isdir(os.path.join(BOOT_FOLDER, core_folder)):
+                    tracks = []
+
+                    for f in os.listdir(os.path.join(BOOT_FOLDER, core_folder)):
+                        filename = os.path.join(BOOT_FOLDER, core_folder, f)
+                        if self.is_valid_file(filename):
+                            tracks.append(filename)
+                    
+                    if len(tracks) == 0:
+                        return
+                    
+                    log("Playing core boot track...")
+                    self.play(tracks[random_index(tracks)])
+
 
 def send_socket(msg: str):
     if not os.path.exists(SOCKET_FILE):
@@ -538,7 +557,9 @@ def start_service(player: Player):
             log("CORENAME file is missing, exiting...")
             break
 
-        if core == new_core or PLAY_IN_CORE:
+        if core == new_core:
+            pass
+        elif PLAY_IN_CORE:
             pass
         elif new_core == MENU_CORE:
             log("Switched to menu core, starting playlist...")
@@ -546,6 +567,7 @@ def start_service(player: Player):
         elif new_core != MENU_CORE:
             log("Exited menu core, stopping playlist...")
             player.stop_playlist()
+            player.play_core_boot(new_core)
 
         core = new_core
 
