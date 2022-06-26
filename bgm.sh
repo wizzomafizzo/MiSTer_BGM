@@ -30,7 +30,15 @@ MENU_CORE = "MENU"
 DEBUG = False
 
 
-# TODO: remote control http server, separate file
+# TODO: separate remote control http server
+# TODO: option to play music after inactivity period
+# TODO: option to adjust adjust volume on menu launch
+# TODO: add default item to menu, print after menu
+# TODO: shared "boot" subfolder
+# TODO: allow setting playincore in memory
+# TODO: add support to play specific track per core on core startup
+# TODO: work out forum issue with it not working when no playlists exist
+# TODO: wait until gui exit to save ini file
 
 
 # read ini file
@@ -388,6 +396,8 @@ class Player:
         s.bind(SOCKET_FILE)
 
         def handler(cmd: str):
+            global PLAY_IN_CORE
+
             log("Received command: {}".format(cmd))
             if cmd == "stop":
                 self.stop_playlist()
@@ -401,10 +411,10 @@ class Player:
                 self.start_playlist(playback)
             elif cmd == "skip":
                 self.stop()
-            elif cmd.startswith("chpl"):
-                args = cmd.split(" ", 1)
-                if len(args) > 1:
-                    name = args[1]
+            elif cmd.startswith("set playlist"):
+                args = cmd.split(" ", 2)
+                if len(args) > 2:
+                    name = args[2]
                     self.change_playlist(name)
             elif cmd == "pid":
                 return os.getpid()
@@ -424,6 +434,10 @@ class Player:
                 return "{}\t{}\t{}\t{}".format(
                     is_playing, self.playback, playlist, filename
                 )
+            elif cmd == "set playincore yes":
+                PLAY_IN_CORE = True
+            elif cmd == "set playincore no":
+                PLAY_IN_CORE = False
             else:
                 log("Unknown command")
 
@@ -680,32 +694,29 @@ def display_gui():
             playincore = config.getboolean("bgm", "playincore", fallback=PLAY_IN_CORE)
             if playincore:
                 config["bgm"]["playincore"] = "no"
+                send_socket("set playincore no")
             else:
                 config["bgm"]["playincore"] = "yes"
+                send_socket("set playincore yes")
             write_config(config)
-            script = os.path.join(SCRIPTS_FOLDER, "bgm.sh")
-            os.system("{} restart > /dev/null".format(script))
-            log("Waiting for service restart...", True)
-            # FIXME: any better way to wait for service?
-            time.sleep(2)
         elif selection == 8:
-            send_socket("chpl none")
+            send_socket("set playlist none")
             config["bgm"]["playlist"] = "none"
             write_config(config)
         elif selection == 9:
-            send_socket("chpl all")
+            send_socket("set playlist all")
             config["bgm"]["playlist"] = "all"
             write_config(config)
         elif selection > 9:
             name = playlists[selection - 10]
-            send_socket("chpl {}".format(name))
+            send_socket("set playlist {}".format(name))
             config["bgm"]["playlist"] = name
             write_config(config)
 
 
 if __name__ == "__main__":
     if len(sys.argv) == 2:
-        if sys.argv[1] == "start-service":
+        if sys.argv[1] == "exec":
             if os.path.exists(SOCKET_FILE):
                 log("BGM service is already running, exiting...", True)
                 sys.exit()
@@ -725,7 +736,7 @@ if __name__ == "__main__":
                 log("Auto-start is disabled in configuration", True)
                 sys.exit()
             os.system(
-                "{} start-service &".format(os.path.join(SCRIPTS_FOLDER, "bgm.sh"))
+                "{} exec &".format(os.path.join(SCRIPTS_FOLDER, "bgm.sh"))
             )
             sys.exit()
         elif sys.argv[1] == "stop":
@@ -759,7 +770,7 @@ if __name__ == "__main__":
         if not os.path.exists(SOCKET_FILE):
             log("Starting BGM service...", True)
             os.system(
-                "{} start-service &".format(os.path.join(SCRIPTS_FOLDER, "bgm.sh"))
+                "{} exec &".format(os.path.join(SCRIPTS_FOLDER, "bgm.sh"))
             )
             sys.exit()
         else:

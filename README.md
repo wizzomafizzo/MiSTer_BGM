@@ -1,5 +1,7 @@
 # MiSTer_BGM
-Background music player for the [MiSTer](https://github.com/MiSTer-devel/Main_MiSTer/wiki) menu
+Background music player for the [MiSTer](https://github.com/MiSTer-devel/Main_MiSTer/wiki) menu.
+
+This script works well with the [Favorites](https://github.com/wizzomafizzo/MiSTer_Favorites) and [Games Menu](https://github.com/wizzomafizzo/MiSTer_GamesMenu) scripts.
 
 ## Installation
 Copy [bgm.sh](https://github.com/wizzomafizzo/MiSTer_BGM/raw/main/bgm.sh) to the `Scripts` folder on your SD card.
