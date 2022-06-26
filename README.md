@@ -63,14 +63,23 @@ The `none` playlist (the default) can be used to only use files from the top lev
 
 The `all` playlist will play all files from every folder in the `music` folder.
 
-### Per track looping
-
-Individual music files can be configured to loop a certain number of times. If you have a short piece of background music from a game that you'd like to run longer, you can set it so that when that track starts playing it will loop a certain number of times before continuing to the next track.
-
-You can do this be renaming the music file so it has `X##_` in front of the filename where `##` is the number of times it should loop with a leading zero. For example: `X05_My File.mp3` would loop it 5 times, while `X23_My File.mp3` would loop it 23 times.
 
 ### Boot sounds
 
 Marking a music file as a boot sound will make BGM play it once when MiSTer starts up. This is intended for very short sound clips, like what you'd hear when booting up *\<your favourite console\>*.
 
 Rename a music file with a `_` in front to make BGM play this file first on MiSTer startup (e.g. `_My File.mp3`). This can be done with multiple files to have it pick a random one each time. Boot sounds are picked from the active playlist and will be excluded from normal play.
+
+#### Global boot sounds
+
+Boot sounds can be added to play no matter which playlist is active. To do this, create a new folder called `boot` in your `music` folder and add your tracks here as normal. They will be included in the pool of possible tracks selected to play on boot, as well as any boot sounds marked in your active playlist. Files in this folder do not need to be prefixed with a `_` character.
+
+#### Core boot sounds
+
+Boot sounds can also be added which will play when a specific core is launched. Create a subfolder in the `boot` folder with its name matching the core. When the core is launched, BGM will select a track from this folder to play once as the core is starting. For example, to play a boot sound when the SNES core is launched, create a folder called `SNES` in the `music/boot` folder and copy your tracks into it. Core boot sounds do not need a `_` prefix and are independent of all other boot sounds.
+
+### Per track looping
+
+Individual music files can be configured to loop a certain number of times. If you have a short piece of background music from a game that you'd like to run longer, you can set it so that when that track starts playing it will loop a certain number of times before continuing to the next track.
+
+You can do this be renaming the music file so it has `X##_` in front of the filename where `##` is the number of times it should loop with a leading zero. For example: `X05_My File.mp3` would loop it 5 times, while `X23_My File.mp3` would loop it 23 times.
