@@ -33,7 +33,6 @@ DEBUG = False
 # TODO: separate remote control http server
 # TODO: option to play music after inactivity period
 # TODO: option to adjust adjust volume on menu launch
-# TODO: add default item to menu, print after menu
 # TODO: shared "boot" subfolder
 # TODO: allow setting playincore in memory
 # TODO: add support to play specific track per core on core startup
@@ -584,7 +583,7 @@ def display_gui():
         else:
             return ""
 
-    def menu(status, playlists, config):
+    def menu(status, playlists, config, last_item):
         if status[0] == "yes":
             play_text = "Stop playing"
         else:
@@ -613,6 +612,8 @@ def display_gui():
             "Select",
             "--cancel-label",
             "Exit",
+            "--default-item",
+            str(last_item),
             "--menu",
             "Now playing: {}\nPlayback: {}\nPlaylist: {}".format(
                 now_playing, status[1], status[2]
@@ -653,16 +654,19 @@ def display_gui():
 
         return selection, button
 
+    last_item = ""
     button = 0
     while button == 0:
         status = get_status()
         playlists = get_playlists()
         config = get_config()
 
-        selection, button = menu(status, playlists, config)
+        selection, button = menu(status, playlists, config, last_item)
 
         if selection is None:
             break
+
+        last_item = str(selection)
 
         if selection == 1:
             send_socket("skip")
@@ -775,4 +779,5 @@ if __name__ == "__main__":
             sys.exit()
         else:
             display_gui()
+            print("")
             sys.exit()
