@@ -16,6 +16,7 @@ import re
 DEFAULT_PLAYBACK = "random"
 DEFAULT_PLAYLIST = None
 MUSIC_FOLDER = "/media/fat/music"
+BOOT_FOLDER = os.path.join(MUSIC_FOLDER, "boot")
 ENABLE_STARTUP = True
 PLAY_IN_CORE = False
 HISTORY_SIZE = 0.2  # ratio of total tracks to keep in play history
@@ -33,7 +34,6 @@ DEBUG = False
 # TODO: separate remote control http server
 # TODO: option to play music after inactivity period
 # TODO: option to adjust adjust volume on menu launch
-# TODO: shared "boot" subfolder
 # TODO: add support to play specific track per core on core startup
 # TODO: wait until gui exit to save ini file
 
@@ -260,7 +260,7 @@ class Player:
         return tracks
 
     def total_tracks(self, playlist=None, include_boot=False):
-        return len(self.get_tracks(playlist, include_boot=include_boot))
+        return len(self.get_tracks(playlist, include_boot))
 
     def add_history(self, filename: str):
         history_size = math.floor(self.total_tracks() * HISTORY_SIZE)
@@ -464,6 +464,12 @@ class Player:
             if name.startswith("_") and self.is_valid_file(name):
                 boot_tracks.append(os.path.join(self.get_playlist_path(), name))
 
+        # include tracks from global boot folder
+        if os.path.exists(BOOT_FOLDER):
+            for name in os.listdir(BOOT_FOLDER):
+                if self.is_valid_file(name):
+                    boot_tracks.append(os.path.join(BOOT_FOLDER, name))
+
         if len(boot_tracks) > 0:
             return boot_tracks[random_index(boot_tracks)]
         else:
@@ -615,7 +621,7 @@ def display_gui():
             str(last_item),
             "--menu",
             "Now playing: {}\nPlayback: {}\nPlaylist: {}".format(
-                now_playing, status[1], status[2]
+                now_playing, status[1].title(), status[2]
             ),
             "20",
             "75",
@@ -627,9 +633,11 @@ def display_gui():
             "3",
             "PLAYBACK > Play random tracks (random)" + active(status[1] == "random"),
             "4",
-            "PLAYBACK > Play a single random track on repeat (loop)" + active(status[1] == "loop"),
+            "PLAYBACK > Play a single random track on repeat (loop)"
+            + active(status[1] == "loop"),
             "5",
-            "PLAYBACK > Disable all playback (disabled)" + active(status[1] == "disabled"),
+            "PLAYBACK > Disable all playback (disabled)"
+            + active(status[1] == "disabled"),
             "6",
             "CONFIG   > {}".format(startup),
             "7",
@@ -641,9 +649,14 @@ def display_gui():
         ]
 
         number = 10
+        excluded_folders = {"boot"}
         for playlist in playlists:
+            if playlist in excluded_folders:
+                continue
             args.append(str(number))
-            args.append("PLAYLIST > {}".format(playlist) + active(status[2] == playlist))
+            args.append(
+                "PLAYLIST > {}".format(playlist) + active(status[2] == playlist)
+            )
             number += 1
 
         result = subprocess.run(args, stderr=subprocess.PIPE)
@@ -738,9 +751,7 @@ if __name__ == "__main__":
             if not ENABLE_STARTUP:
                 log("Auto-start is disabled in configuration", True)
                 sys.exit()
-            os.system(
-                "{} exec &".format(os.path.join(SCRIPTS_FOLDER, "bgm.sh"))
-            )
+            os.system("{} exec &".format(os.path.join(SCRIPTS_FOLDER, "bgm.sh")))
             sys.exit()
         elif sys.argv[1] == "stop":
             if not os.path.exists(SOCKET_FILE):
@@ -772,9 +783,7 @@ if __name__ == "__main__":
     else:
         if not os.path.exists(SOCKET_FILE):
             log("Starting BGM service...", True)
-            os.system(
-                "{} exec &".format(os.path.join(SCRIPTS_FOLDER, "bgm.sh"))
-            )
+            os.system("{} exec &".format(os.path.join(SCRIPTS_FOLDER, "bgm.sh")))
             sys.exit()
         else:
             display_gui()
