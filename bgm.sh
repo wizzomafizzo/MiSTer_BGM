@@ -35,7 +35,6 @@ DEBUG = False
 # TODO: option to play music after inactivity period
 # TODO: option to adjust adjust volume on menu launch
 # TODO: add support to play specific track per core on core startup
-# TODO: wait until gui exit to save ini file
 # TODO: update docs, updater file
 
 
@@ -437,6 +436,20 @@ class Player:
                 PLAY_IN_CORE = True
             elif cmd == "set playincore no":
                 PLAY_IN_CORE = False
+            elif cmd.startswith("get"):
+                args = cmd.split(" ", 1)
+                if len(args) > 1:
+                    if args[1] == "playlist":
+                        return self.playlist
+                    elif args[1] == "playback":
+                        return self.playback
+                    elif args[1] == "playincore":
+                        if PLAY_IN_CORE:
+                            return "yes"
+                        else:
+                            return "no"
+                    else:
+                        return ""
             else:
                 log("Unknown command")
 
