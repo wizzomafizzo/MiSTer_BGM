@@ -34,9 +34,7 @@ DEBUG = False
 # TODO: option to play music after inactivity period
 # TODO: option to adjust adjust volume on menu launch
 # TODO: shared "boot" subfolder
-# TODO: allow setting playincore in memory
 # TODO: add support to play specific track per core on core startup
-# TODO: work out forum issue with it not working when no playlists exist
 # TODO: wait until gui exit to save ini file
 
 
@@ -223,6 +221,7 @@ class Player:
             else:
                 folder = os.path.join(MUSIC_FOLDER, name)
             if not os.path.exists(folder):
+                log("Playlist folder does not exist: {}".format(folder))
                 return None
             else:
                 return folder
@@ -248,10 +247,10 @@ class Player:
 
         if playlist is None:
             # just the top level folder
-            filtered = self.filter_tracks(os.listdir(folder), include_boot=include_boot)
+            filtered = self.filter_tracks(os.listdir(folder), include_boot)
             for track in filtered:
                 tracks.append(os.path.join(folder, track))
-        else:
+        elif folder is not None:
             # otherwise do recursively
             for root, dirs, files in os.walk(folder):
                 filtered = self.filter_tracks(files, include_boot)
