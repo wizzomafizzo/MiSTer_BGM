@@ -35,7 +35,6 @@ DEBUG = False
 # TODO: separate remote control http server
 # TODO: option to play music after inactivity period
 # TODO: option to adjust adjust volume on menu launch
-# TODO: add delay option for core boot sounds
 
 
 # read ini file
