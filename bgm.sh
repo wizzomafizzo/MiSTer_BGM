@@ -17,6 +17,7 @@ DEFAULT_PLAYBACK = "random"
 DEFAULT_PLAYLIST = None
 MUSIC_FOLDER = "/media/fat/music"
 BOOT_FOLDER = os.path.join(MUSIC_FOLDER, "boot")
+CORE_BOOT_DELAY = 0
 ENABLE_STARTUP = True
 PLAY_IN_CORE = False
 HISTORY_SIZE = 0.2  # ratio of total tracks to keep in play history
@@ -34,9 +35,7 @@ DEBUG = False
 # TODO: separate remote control http server
 # TODO: option to play music after inactivity period
 # TODO: option to adjust adjust volume on menu launch
-# TODO: add note about core boot sounds and mgl files
 # TODO: add delay option for core boot sounds
-# TODO: add screenshot
 
 
 # read ini file
@@ -48,6 +47,7 @@ if os.path.exists(INI_FILE):
     DEBUG = ini.getboolean("bgm", "debug", fallback=DEBUG)
     ENABLE_STARTUP = ini.getboolean("bgm", "startup", fallback=ENABLE_STARTUP)
     PLAY_IN_CORE = ini.getboolean("bgm", "playincore", fallback=PLAY_IN_CORE)
+    CORE_BOOT_DELAY = ini.getfloat("bgm", "corebootdelay", fallback=CORE_BOOT_DELAY)
     DEFAULT_PLAYLIST = ini.get("bgm", "playlist", fallback=DEFAULT_PLAYLIST)
     if DEFAULT_PLAYLIST == "none":
         DEFAULT_PLAYLIST = None
@@ -56,7 +56,7 @@ else:
     if os.path.exists(MUSIC_FOLDER):
         with open(INI_FILE, "w") as f:
             f.write(
-                "[bgm]\nplayback = random\nplaylist = none\nstartup = yes\nplayincore = no\ndebug = no\n"
+                "[bgm]\nplayback = random\nplaylist = none\nstartup = yes\nplayincore = no\ncorebootdelay = 0\ndebug = no\n"
             )
 
 
@@ -515,6 +515,7 @@ class Player:
                     if len(tracks) == 0:
                         return
                     
+                    time.sleep(CORE_BOOT_DELAY)
                     log("Playing core boot track...")
                     self.play(tracks[random_index(tracks)])
 
@@ -798,6 +799,7 @@ if __name__ == "__main__":
             script = os.path.join(SCRIPTS_FOLDER, "bgm.sh")
             os.system("{} stop".format(script))
             os.system("{} start".format(script))
+            sys.exit()
 
     if not os.path.exists(MUSIC_FOLDER):
         os.mkdir(MUSIC_FOLDER)
