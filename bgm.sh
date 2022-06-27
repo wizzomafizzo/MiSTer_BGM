@@ -36,6 +36,7 @@ DEBUG = False
 # TODO: option to adjust adjust volume on menu launch
 # TODO: add note about core boot sounds and mgl files
 # TODO: add delay option for core boot sounds
+# TODO: add screenshot
 
 
 # read ini file
@@ -455,11 +456,13 @@ class Player:
 
         def listener():
             while True:
+                log("Waiting for command...")
                 s.listen()
                 conn, addr = s.accept()
                 data = conn.recv(MESSAGE_SIZE).decode()
                 if data == "quit":
                     break
+                log("Got command, sending so handler...")
                 response = handler(data)
                 if response is not None:
                     conn.send(str(response).encode())
@@ -604,8 +607,11 @@ def display_gui():
         return send_socket("status").split("\t")
 
     def get_playlists():
+        excluded_folders = {"boot"}
         playlists = []
         for item in os.listdir(MUSIC_FOLDER):
+            if item in excluded_folders:
+                continue
             if os.path.isdir(os.path.join(MUSIC_FOLDER, item)):
                 playlists.append(item)
         return playlists
@@ -686,10 +692,7 @@ def display_gui():
         ]
 
         number = 10
-        excluded_folders = {"boot"}
         for playlist in playlists:
-            if playlist in excluded_folders:
-                continue
             args.append(str(number))
             args.append(
                 "PLAYLIST > {}".format(playlist) + active(status[2] == playlist)
