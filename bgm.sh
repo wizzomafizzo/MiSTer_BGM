@@ -34,7 +34,8 @@ DEBUG = False
 # TODO: separate remote control http server
 # TODO: option to play music after inactivity period
 # TODO: option to adjust adjust volume on menu launch
-# TODO: update docs, updater file
+# TODO: add note about core boot sounds and mgl files
+# TODO: add delay option for core boot sounds
 
 
 # read ini file
@@ -398,21 +399,10 @@ class Player:
             log("Received command: {}".format(cmd))
             if cmd == "stop":
                 self.stop_playlist()
-            elif cmd.startswith("play"):
-                args = cmd.split(" ", 1)
-                if len(args) > 1:
-                    playback = args[1]
-                else:
-                    playback = self.playback
-                self.stop_playlist()
-                self.start_playlist(playback)
+            elif cmd == "play":
+                self.start_playlist()
             elif cmd == "skip":
                 self.stop()
-            elif cmd.startswith("set playlist"):
-                args = cmd.split(" ", 2)
-                if len(args) > 2:
-                    name = args[2]
-                    self.change_playlist(name)
             elif cmd == "pid":
                 return os.getpid()
             elif cmd == "status":
@@ -431,6 +421,17 @@ class Player:
                 return "{}\t{}\t{}\t{}".format(
                     is_playing, self.playback, playlist, filename
                 )
+            elif cmd.startswith("set playlist"):
+                args = cmd.split(" ", 2)
+                if len(args) > 2:
+                    name = args[2]
+                    self.change_playlist(name)
+            elif cmd.startswith("set playback"):
+                args = cmd.split(" ", 2)
+                if len(args) > 2:
+                    self.playback = args[2]
+                    if self.in_playlist():
+                        self.start_playlist()
             elif cmd == "set playincore yes":
                 PLAY_IN_CORE = True
             elif cmd == "set playincore no":
@@ -725,13 +726,13 @@ def display_gui():
             else:
                 send_socket("play")
         elif selection == 3:
-            send_socket("play random")
+            send_socket("set playback random")
             config["bgm"]["playback"] = "random"
         elif selection == 4:
-            send_socket("play loop")
+            send_socket("set playback loop")
             config["bgm"]["playback"] = "loop"
         elif selection == 5:
-            send_socket("play disabled")
+            send_socket("set playback disabled")
             config["bgm"]["playback"] = "disabled"
         elif selection == 6:
             startup = config.getboolean("bgm", "startup", fallback=ENABLE_STARTUP)
