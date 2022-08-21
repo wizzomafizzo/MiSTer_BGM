@@ -42,7 +42,7 @@ Launch `bgm` from the scripts menu to show the control GUI.
 
 ## Supported files
 
-BGM supports playback of .mp3, .ogg, .wav and .vgm/.vgz files. These files can be used interchangeably in any playlist.
+BGM supports playback of .mp3, .ogg, .wav, .mid and .vgm/.vgz files. These files can be used interchangeably in any playlist.
 
 ### Internet radio
 
