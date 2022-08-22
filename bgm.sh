@@ -23,6 +23,7 @@ PLAY_IN_CORE = False
 HISTORY_SIZE = 0.2  # ratio of total tracks to keep in play history
 SOCKET_FILE = "/tmp/bgm.sock"
 MESSAGE_SIZE = 4096  # max size of socket payloads
+MIDI_PORT = "128:0"
 SCRIPTS_FOLDER = "/media/fat/Scripts"
 STARTUP_SCRIPT = "/media/fat/linux/user-startup.sh"
 CORENAME_FILE = "/tmp/CORENAME"
@@ -134,6 +135,9 @@ class Player:
     def is_wav(self, filename: str):
         return filename.lower().endswith(".wav")
 
+    def is_mid(self, filename: str):
+        return filename.lower().endswith(".mid")
+
     def is_vgm(self, filename: str):
         match = re.search(".*\.(vgm|vgz|vgm\.gz)$", filename.lower())
         return match is not None
@@ -143,6 +147,7 @@ class Player:
             self.is_mp3(filename)
             or self.is_ogg(filename)
             or self.is_wav(filename)
+            or self.is_mid(filename)
             or self.is_vgm(filename)
             or self.is_pls(filename)
         )
@@ -204,6 +209,10 @@ class Player:
 
     def play_wav(self, filename: str):
         args = ("aplay", filename)
+        self.play_file(args)
+
+    def play_mid(self, filename: str):
+        args = ("aplaymidi", filename, "--port=" + MIDI_PORT)
         self.play_file(args)
 
     def play_vgm(self, filename: str):
@@ -303,6 +312,8 @@ class Player:
                 self.play_ogg(filename)
             elif self.is_wav(filename):
                 self.play_wav(filename)
+            elif self.is_mid(filename):
+                self.play_mid(filename)
             elif self.is_vgm(filename):
                 self.play_vgm(filename)
             loop -= 1
