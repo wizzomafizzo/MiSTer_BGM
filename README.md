@@ -4,7 +4,7 @@ Background music player for the [MiSTer](https://github.com/MiSTer-devel/Main_Mi
 
 ![Control GUI](https://github.com/wizzomafizzo/MiSTer_BGM/raw/main/images/gui.png)
 
-This script works well with the [Favorites](https://github.com/wizzomafizzo/MiSTer_Favorites) and [Games Menu](https://github.com/wizzomafizzo/MiSTer_GamesMenu) scripts.
+Check out [MiSTer Extensions](https://github.com/wizzomafizzo/mrext) for other useful scripts!
 
 ## Features
 
