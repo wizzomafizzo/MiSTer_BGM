@@ -34,6 +34,7 @@ CMD_INTERFACE = "/dev/MiSTer_cmd"
 MENU_VOLUME = -1
 DEFAULT_VOLUME = -1
 DEBUG = False
+INI_FILE = os.path.join(MUSIC_FOLDER, INI_FILENAME)
 
 
 # TODO: separate remote control http server
@@ -41,28 +42,37 @@ DEBUG = False
 # TODO: option to adjust adjust volume on menu launch
 
 
-# read ini file
-INI_FILE = os.path.join(MUSIC_FOLDER, INI_FILENAME)
-if os.path.exists(INI_FILE):
-    ini = configparser.ConfigParser()
-    ini.read(INI_FILE)
-    DEFAULT_PLAYBACK = ini.get("bgm", "playback", fallback=DEFAULT_PLAYBACK)
-    DEBUG = ini.getboolean("bgm", "debug", fallback=DEBUG)
-    ENABLE_STARTUP = ini.getboolean("bgm", "startup", fallback=ENABLE_STARTUP)
-    PLAY_IN_CORE = ini.getboolean("bgm", "playincore", fallback=PLAY_IN_CORE)
-    CORE_BOOT_DELAY = ini.getfloat("bgm", "corebootdelay", fallback=CORE_BOOT_DELAY)
-    DEFAULT_PLAYLIST = ini.get("bgm", "playlist", fallback=DEFAULT_PLAYLIST)
-    if DEFAULT_PLAYLIST == "none":
-        DEFAULT_PLAYLIST = None
-    MENU_VOLUME = ini.getint("bgm", "menuvolume", fallback=MENU_VOLUME)
-    DEFAULT_VOLUME = ini.getint("bgm", "defaultvolume", fallback=DEFAULT_VOLUME)
-else:
-    # create a default ini
-    if os.path.exists(MUSIC_FOLDER):
-        with open(INI_FILE, "w") as f:
-            f.write(
-                "[bgm]\nplayback = random\nplaylist = none\nstartup = yes\nplayincore = no\ncorebootdelay = 0\nmenuvolume = -1\ndefaultvolume = -1\ndebug = no\n"
-            )
+def load_ini():
+    global DEFAULT_PLAYBACK
+    global DEBUG
+    global ENABLE_STARTUP
+    global PLAY_IN_CORE
+    global CORE_BOOT_DELAY
+    global DEFAULT_PLAYLIST
+    global MENU_VOLUME
+    global DEFAULT_VOLUME
+
+    # read ini file
+    if os.path.exists(INI_FILE):
+        ini = configparser.ConfigParser()
+        ini.read(INI_FILE)
+        DEFAULT_PLAYBACK = ini.get("bgm", "playback", fallback=DEFAULT_PLAYBACK)
+        DEBUG = ini.getboolean("bgm", "debug", fallback=DEBUG)
+        ENABLE_STARTUP = ini.getboolean("bgm", "startup", fallback=ENABLE_STARTUP)
+        PLAY_IN_CORE = ini.getboolean("bgm", "playincore", fallback=PLAY_IN_CORE)
+        CORE_BOOT_DELAY = ini.getfloat("bgm", "corebootdelay", fallback=CORE_BOOT_DELAY)
+        DEFAULT_PLAYLIST = ini.get("bgm", "playlist", fallback=DEFAULT_PLAYLIST)
+        if DEFAULT_PLAYLIST == "none":
+            DEFAULT_PLAYLIST = None
+        MENU_VOLUME = ini.getint("bgm", "menuvolume", fallback=MENU_VOLUME)
+        DEFAULT_VOLUME = ini.getint("bgm", "defaultvolume", fallback=DEFAULT_VOLUME)
+    else:
+        # create a default ini
+        if os.path.exists(MUSIC_FOLDER):
+            with open(INI_FILE, "w") as f:
+                f.write(
+                    "[bgm]\nplayback = random\nplaylist = none\nstartup = yes\nplayincore = no\ncorebootdelay = 0\nmenuvolume = -1\ndefaultvolume = -1\ndebug = no\n"
+                )
 
 
 def log(msg: str, always_print=False):
@@ -491,6 +501,9 @@ class Player:
                             return "no"
                     else:
                         return ""
+            elif cmd == "reload":
+                log("Reloading ini file...")
+                load_ini()
             else:
                 log("Unknown command: {}".format(cmd))
 
@@ -827,6 +840,7 @@ def display_gui():
 
         if selection is None:
             write_config(config)
+            send_socket("reload")
             break
 
         last_item = str(selection)
@@ -893,6 +907,7 @@ def display_gui():
 
 
 if __name__ == "__main__":
+    load_ini()
     if len(sys.argv) == 2:
         if sys.argv[1] == "exec":
             if os.path.exists(SOCKET_FILE):
