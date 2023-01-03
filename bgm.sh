@@ -40,7 +40,6 @@ CONFIG_DEFAULTS = {
 
 # TODO: separate remote control http server
 # TODO: option to play music after inactivity period
-# TODO: option to adjust adjust volume on menu launch
 
 
 def write_default_ini():

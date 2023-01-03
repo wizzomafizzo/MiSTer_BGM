@@ -46,7 +46,7 @@ BGM supports playback of .mp3, .ogg, .wav, .mid and .vgm/.vgz files. These files
 
 ### Internet radio
 
-Internet radio stations can be played using .pls files. The best way to manage these is by creating a new playlist folder, placing a single .pls file in that folder and playing it via the new playlist.
+Internet radio stations can be played using .pls files. The best way to manage this is by creating a new playlist folder, placing a single .pls file in that folder and playing it via the new playlist.
 
 Multiple .pls files can be placed in a playlist (along with any other file), but they'll need to be manually skipped to move onto the next one.
 
@@ -81,7 +81,7 @@ The `all` playlist will play all files from every folder in the `music` folder.
 
 Marking a music file as a boot sound will make BGM play it once when MiSTer starts up. This is intended for very short sound clips, like what you'd hear when booting up *\<your favourite console\>*.
 
-Rename a music file with a `_` in front to make BGM play this file first on MiSTer start up (e.g. `_My File.mp3`). This can be done with multiple files to have it pick a random one each time. Boot sounds are picked from the active playlist and will be excluded from normal play.
+Rename a music file with a `_` at the front to make BGM play this file first on MiSTer start up (e.g. `_My File.mp3`). This can be done with multiple files to have it pick a random one each time. Boot sounds are picked from the active playlist and will be excluded from normal play.
 
 ### Global boot sounds
 
@@ -99,7 +99,7 @@ When the core is launched, BGM will select a track from this folder to play once
 
 Core boot sounds do not need to be prefixed with a `_` character and are independent of all other boot sounds. **Note that core boot sounds will also trigger on .mgl file launches, as BGM cannot distinguish between those and a standalone core launch.**
 
-A delay can be set before these boot sounds are triggered, to account for the time it takes for your monitor or TV to sync over HDMI. You can do this by adding the following line to your `bgm.ini` file:
+A delay can be set before these boot sounds are triggered, to account for the time it takes for your monitor or TV to sync over HDMI. You can do this by setting the following line in your `bgm.ini` file:
 ```
 corebootdelay = 0
 ```
@@ -109,4 +109,22 @@ And changing `0` to the number of seconds you want to delay the sound playing. T
 
 Individual music files can be configured to loop a certain number of times. If you have a short piece of background music from a game that you'd like to run longer, you can set it so that when that track starts playing it will loop a certain number of times before continuing to the next track.
 
-You can do this be renaming the music file so it has `X##_` in front of the filename where `##` is the number of times it should loop with a leading zero. For example: `X05_My File.mp3` would loop it 5 times, while `X23_My File.mp3` would loop it 23 times.
+You can do this be renaming the music file, so it has `X##_` in front of the filename where `##` is the number of times it should loop with a leading zero. For example: `X05_My File.mp3` would loop it 5 times, while `X23_My File.mp3` would loop it 23 times.
+
+## Volume control
+
+BGM can automatically adjust MiSTer's global volume depending on if a core is running or not. This is useful if tracks are too loud or quiet compared to the core's audio, and you don't want to go to the trouble of normalising the music files yourself.
+
+To enable this feature, set the `Menu volume` and `Default volume` entries in the BGM control GUI. 
+
+Or, set the following lines in your `bgm.ini` file:
+```
+menuvolume = 7
+defaultvolume = 3
+```
+
+**Both of these values must be set for the feature to function.**
+
+Change each number to a number in the range of 0-7 that works best for your setup. 0 means muted and 7 means max volume. Set them to -1 (the default) to disable this feature.
+
+Once enabled, when the menu core is running MiSTer's volume will be set to `menuvolume`, and when a core is running it will be set to `defaultvolume`.
