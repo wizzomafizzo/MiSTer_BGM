@@ -30,6 +30,9 @@ CORENAME_FILE = "/tmp/CORENAME"
 LOG_FILE = "/tmp/bgm.log"
 INI_FILENAME = "bgm.ini"
 MENU_CORE = "MENU"
+CMD_INTERFACE = "/dev/MiSTer_cmd"
+MENU_VOLUME = -1
+DEFAULT_VOLUME = -1
 DEBUG = False
 
 
@@ -51,12 +54,14 @@ if os.path.exists(INI_FILE):
     DEFAULT_PLAYLIST = ini.get("bgm", "playlist", fallback=DEFAULT_PLAYLIST)
     if DEFAULT_PLAYLIST == "none":
         DEFAULT_PLAYLIST = None
+    MENU_VOLUME = ini.getint("bgm", "menuvolume", fallback=MENU_VOLUME)
+    DEFAULT_VOLUME = ini.getint("bgm", "defaultvolume", fallback=DEFAULT_VOLUME)
 else:
     # create a default ini
     if os.path.exists(MUSIC_FOLDER):
         with open(INI_FILE, "w") as f:
             f.write(
-                "[bgm]\nplayback = random\nplaylist = none\nstartup = yes\nplayincore = no\ncorebootdelay = 0\ndebug = no\n"
+                "[bgm]\nplayback = random\nplaylist = none\nstartup = yes\nplayincore = no\ncorebootdelay = 0\nmenuvolume = -1\ndefaultvolume = -1\ndebug = no\n"
             )
 
 
@@ -84,6 +89,26 @@ def get_core():
 
     with open(CORENAME_FILE) as f:
         return str(f.read())
+
+
+def volume_mute():
+    with open(CMD_INTERFACE, "w") as f:
+        f.write("volume mute")
+
+
+def volume_unmute():
+    with open(CMD_INTERFACE, "w") as f:
+        f.write("volume unmute")
+
+
+def volume_set(volume: int):
+    if volume < 0:
+        volume = 0
+    if volume > 7:
+        volume = 7
+
+    with open(CMD_INTERFACE, "w") as f:
+        f.write("volume {}".format(volume))
 
 
 def wait_core_change():
@@ -612,13 +637,68 @@ def try_add_to_startup():
         log("Added service to startup script.", True)
 
 
-def display_gui():
-    def get_menu_output(output):
-        try:
-            return int(output)
-        except ValueError:
-            return None
+def get_menu_output(output):
+    try:
+        return int(output)
+    except ValueError:
+        return None
 
+
+def active(condition):
+    if condition:
+        return " [ACTIVE]"
+    else:
+        return ""
+
+
+def volume_select_dialog(title: str, blurb: str, current: int, set_live=False) -> (int, int):
+    args = [
+        "dialog",
+        "--title",
+        title,
+        "--ok-label",
+        "Set",
+        "--cancel-label",
+        "Cancel",
+        "--default-item",
+        str(current),
+        "--menu",
+        blurb,
+        "20",
+        "75",
+        "20",
+        "-1",
+        "Disabled (make no changes to volume)" + active(current == -1),
+        "0",
+        "Mute" + active(current == 0),
+        "1",
+        "Level 1" + active(current == 1),
+        "2",
+        "Level 2" + active(current == 2),
+        "3",
+        "Level 3" + active(current == 3),
+        "4",
+        "Level 4" + active(current == 4),
+        "5",
+        "Level 5" + active(current == 5),
+        "6",
+        "Level 6" + active(current == 6),
+        "7",
+        "Level 7 (max)" + active(current == 7),
+    ]
+
+    result = subprocess.run(args, stderr=subprocess.PIPE)
+
+    selection = get_menu_output(result.stderr.decode())
+    button = get_menu_output(result.returncode)
+
+    if button == 0 and selection is not None and selection >= 0 and set_live:
+        volume_set(selection)
+
+    return selection, button
+
+
+def display_gui():
     def get_status():
         # FIXME: this is a hack to give service time to update itself, would be
         #        better if it could check an update was successful before
@@ -645,12 +725,6 @@ def display_gui():
         with open(INI_FILE, "w") as f:
             config.write(f)
 
-    def active(condition):
-        if condition:
-            return " [ACTIVE]"
-        else:
-            return ""
-
     def menu(status, playlists, config, last_item):
         if status[0] == "yes":
             play_text = "Stop playing"
@@ -671,6 +745,18 @@ def display_gui():
             playincore = "Disable music in cores"
         else:
             playincore = "Enable music in cores"
+
+        menu_volume = config.getint("bgm", "menuvolume", fallback=MENU_VOLUME)
+        if menu_volume < 0:
+            menu_volume_status = "(disabled)"
+        else:
+            menu_volume_status = "({})".format(menu_volume)
+
+        default_volume = config.getint("bgm", "defaultvolume", fallback=DEFAULT_VOLUME)
+        if default_volume < 0:
+            default_volume_status = "(disabled)"
+        else:
+            default_volume_status = "({})".format(default_volume)
 
         args = [
             "dialog",
@@ -706,12 +792,16 @@ def display_gui():
             "7",
             "CONFIG   > {}".format(playincore),
             "8",
-            "PLAYLIST > None (just top level files)" + active(status[2] == "none"),
+            "CONFIG   > Auto-change menu volume " + menu_volume_status,
             "9",
+            "CONFIG   > Auto-change default volume " + default_volume_status,
+            "10",
+            "PLAYLIST > None (just top level files)" + active(status[2] == "none"),
+            "11",
             "PLAYLIST > All (all playlists combined)" + active(status[2] == "all"),
         ]
 
-        number = 10
+        number = 12
         for playlist in playlists:
             args.append(str(number))
             args.append(
@@ -772,13 +862,32 @@ def display_gui():
                 config["bgm"]["playincore"] = "yes"
                 send_socket("set playincore yes")
         elif selection == 8:
+            menu_volume = config.getint("bgm", "menuvolume", fallback=MENU_VOLUME)
+            vol_selection, vol_button = volume_select_dialog(
+                "Menu volume", "Automatically change MiSTer's volume in the menu when is open, to adjust music "
+                               "volume. The \"default volume\" setting must also be enabled for this feature to work.",
+                menu_volume, True
+            )
+            if vol_button == 0:
+                config["bgm"]["menuvolume"] = str(vol_selection)
+        elif selection == 9:
+            default_volume = config.getint("bgm", "defaultvolume", fallback=DEFAULT_VOLUME)
+            vol_selection, vol_button = volume_select_dialog(
+                "Default volume", "Automatically revert MiSTer's volume when the menu is closed, to set volume back "
+                                  "to normal. The \"menu volume\" setting must also be enabled for this feature to "
+                                  "work.",
+                default_volume, False
+            )
+            if vol_button == 0:
+                config["bgm"]["defaultvolume"] = str(vol_selection)
+        elif selection == 10:
             send_socket("set playlist none")
             config["bgm"]["playlist"] = "none"
-        elif selection == 9:
+        elif selection == 11:
             send_socket("set playlist all")
             config["bgm"]["playlist"] = "all"
-        elif selection > 9:
-            name = playlists[selection - 10]
+        elif selection > 11:
+            name = playlists[selection - 12]
             send_socket("set playlist {}".format(name))
             config["bgm"]["playlist"] = name
 
