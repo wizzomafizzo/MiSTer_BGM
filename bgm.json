@@ -6,14 +6,14 @@
     "default_options": {},
     "files": {
         "Scripts/bgm.sh": {
-            "hash": "c7be8c929f4fd2e7f73a3520692c577f",
-            "size": 32056,
+            "hash": "b73bd9c4fc8a7424fdbadd28c967ff5f",
+            "size": 32543,
             "url": "https://raw.githubusercontent.com/wizzomafizzo/MiSTer_BGM/main/bgm.sh"
         }
     },
     "folders": {
         "Scripts": {}
     },
-    "timestamp": 1672718157,
+    "timestamp": 1672795748,
     "zips": {}
 }
