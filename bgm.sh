@@ -85,6 +85,16 @@ def log(msg: str, always_print=False):
             )
 
 
+def run_cmd(cmd: str):
+    # FIXME: for some reason trying to open the cmd interface while a core is
+    #        being loaded can sometimes cause the bgm process to hang waiting
+    #        for the handle. this is an attempt to work around that happening
+    #        but I've got no idea why it happens in the first place
+    return os.system("echo \"{}\" > {}".format(cmd, CMD_INTERFACE))
+    # with open(CMD_INTERFACE, "w") as f:
+    #     f.write(cmd)
+
+
 def random_index(xs):
     return random.randint(0, len(xs) - 1)
 
@@ -98,13 +108,11 @@ def get_core():
 
 
 def volume_mute():
-    with open(CMD_INTERFACE, "w") as f:
-        f.write("volume mute")
+    run_cmd("volume mute")
 
 
 def volume_unmute():
-    with open(CMD_INTERFACE, "w") as f:
-        f.write("volume unmute")
+    run_cmd("volume unmute")
 
 
 def volume_set(volume: int):
@@ -113,9 +121,8 @@ def volume_set(volume: int):
     if volume > 7:
         volume = 7
 
-    with open(CMD_INTERFACE, "w") as f:
-        log("Setting volume to {}".format(volume))
-        f.write("volume {}".format(volume))
+    log("Setting volume to {}".format(volume))
+    run_cmd("volume {}".format(volume))
 
 
 def should_change_volume(ini) -> bool:
@@ -648,10 +655,14 @@ def start_service(player: Player):
             pass
         elif new_core == MENU_CORE:
             log("Switched to menu core, starting playlist...")
+            log("Grabbing mutex")
             player.mutex.acquire()
             if should_change_volume(ini):
+                log("Changing volume to menu volume")
                 volume_set(ini["menuvolume"])
+            log("Starting playlist")
             player.start_playlist()
+            log("Releasing mutex")
             player.mutex.release()
         elif new_core != MENU_CORE:
             log("Exited menu core, stopping playlist...")
@@ -662,7 +673,7 @@ def start_service(player: Player):
             log("Playing core boot")
             player.play_core_boot(new_core)
             if should_change_volume(ini):
-                log("Changing volume to menu volume")
+                log("Changing volume to default volume")
                 volume_set(ini["defaultvolume"])
             log("Releasing mutex")
             player.mutex.release()
